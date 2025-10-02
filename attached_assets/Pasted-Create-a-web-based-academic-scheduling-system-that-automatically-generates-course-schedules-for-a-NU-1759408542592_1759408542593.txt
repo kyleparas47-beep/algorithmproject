@@ -1,0 +1,152 @@
+Create a web-based academic scheduling system that automatically generates course schedules for a NU LAGUNA university's computer studies programs (BSIT, BSCS, BSIS) using a greedy algorithm approach. The system should handle section generation, room allocation, and schedule optimization while avoiding conflicts.
+
+Core Requirements
+1. Data Models & Setup
+
+Programs & Sections:
+Support three programs: BSIT, BSCS, BSIS (4 year levels each)
+Section size: 12-40 students per section
+Section naming convention: {ProgramCode}{YearLevel}{Letter} (e.g., BSIT1A, BSCS3B)
+Auto-generate sections based on enrollment numbers (e.g., 175 students → 5 sections of ~35-40 students each)
+
+Courses:
+Two course types:
+Pure Lecture: 4 hours total
+Lecture + Lab: 2.66 hours lecture + 4 hours lab
+Only professional courses (exclude GenEd like Filipino, English)
+Each course must be assigned to a specific program and year level
+
+Rooms:
+Two room types: Lecture rooms and Laboratory rooms
+Operating hours: 7:00 AM - 9:00 PM
+Operating days: Monday - Saturday
+Each room has a fixed type (cannot use lab room for lectures only)
+Faculty (Optional/Semi-Hard):
+
+Two types: Full-time (FT) and Part-time (PT)
+Full-time: minimum 24 hours/week, 5 working days
+Part-time: maximum 18 hours/week, availability-based
+Assign courses to faculty based on hours and availability constraints
+
+2. Scheduling Rules & Constraints
+
+Time Slot Options:
+For Pure Lecture (4 hours):
+Option A: 2 hours on two days (Mon+Thu, Tue+Fri, or Wed+Sat)
+Option B: 4 hours straight once a week
+
+For Lecture+Lab courses:
+Lecture (2.66 hours = 2hrs 40mins):
+Option A: 2hrs 40mins straight once per week
+Option B: Split into 1hr 20mins on two days (e.g., Mon+Thu)
+
+Lab (4 hours):
+Option A: 4 hours straight once per week
+Option B: Split into 2 hours on two days (e.g., Mon+Thu)
+Hard Constraints (Must Not Violate):
+
+No room double-booking (one room cannot host two courses at same time)
+No section conflicts (one section cannot have two courses at same time)
+Lab courses must be scheduled in laboratory rooms
+Lecture courses must be scheduled in lecture rooms
+All schedules must be within 7:00 AM - 9:00 PM window
+All schedules must be Monday-Saturday only
+Soft Constraints (Optimize When Possible):
+
+Minimize gaps in student schedules
+Balance room utilization
+Respect faculty availability and teaching load limits
+
+3. User Workflow
+Step 1: Input Enrollment Data
+For each program (BSIT, BSCS, BSIS) and year level (1-4):
+Input total number of enrolled students
+System automatically generates sections with student distribution
+
+Step 2: Input/Upload Course List
+For each program and year level:
+Course code and name
+Course type (Pure Lecture or Lec+Lab)
+Units/hours (4hrs for lecture, 2.66+4 for lec+lab)
+
+Step 3: Input/Upload Room List
+Room name/number
+Room type (Lecture or Laboratory)
+Available hours (default: 7 AM - 9 PM)
+Available days (default: Monday - Saturday)
+
+Step 4: Generate Schedule
+System runs greedy algorithm to create conflict-free schedule
+Algorithm should prioritize:
+Courses with lab components (harder to schedule)
+Sections with more courses
+Minimize room conflicts and gaps
+
+Step 5: View & Export Results
+Display schedules in multiple views:
+By section (student schedule view)
+By room (room utilization view)
+By course (all sections of one course)
+Master schedule grid (time × room matrix)
+Export to Excel/CSV format
+
+4. Greedy Algorithm Approach
+The scheduling algorithm should follow these principles:
+Sort courses by constraint difficulty:
+Lec+Lab courses first (require 2 room types)
+Courses with most sections first
+Courses with fewer available time slot options
+
+For each course, try to assign time slots:
+Check available rooms of correct type
+Find earliest available time slot that doesn't conflict
+Prioritize day combinations that minimize gaps
+Assign and mark room+time as occupied
+
+Handle conflicts:
+If no slot available, log the conflict
+Provide suggestions for resolution (add rooms, adjust hours)
+
+Validate schedule:
+Ensure no double-bookings
+Ensure all courses scheduled
+Generate conflict report if any issues remain
+
+5. Technical Specifications
+Frontend:
+Clean, modern UI with forms for data input
+Interactive schedule grid/table views
+Drag-and-drop for manual adjustments 
+Real-time validation and conflict detection
+Export functionality
+
+Backend/Data:
+Tables needed:
+Programs, Sections, Courses, Rooms
+Schedule entries (course, section, room, day, time, type)
+Faculty (optional)
+Course assignments to faculty (optional)
+Implement scheduling algorithm in TypeScript
+Handle schedule generation as a background process for large datasets
+
+Database Schema:
+programs: id, code, name
+sections: id, program_id, year_level, letter, student_count
+courses: id, code, name, type (lecture/leclab), hours_lecture, hours_lab, program_id, year_level
+rooms: id, name, type (lecture/lab), start_time, end_time, available_days
+schedules: id, section_id, course_id, room_id, day_pattern, start_time, end_time, schedule_type (lec/lab)
+faculty: id, name, type (FT/PT), max_hours, available_days (optional)
+
+6. Output Format
+Generate schedule entries with:
+Course code and name
+Section
+Day pattern (MonThu, TueFri, WedSat, or single day)
+Time range (e.g., 7:00 AM - 8:20 AM)
+Room
+Type (lecture or lab)
+
+TECHSTACK:
+Frontend - React
+Backend - Java (with JDBC or Spring Boot)
+Database - MySQL in XAMPP
