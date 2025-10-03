@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import './App.css';
+import nuLogo from './assets/national-university-philippines-logo-png_seeklogo-499282-removebg-preview.png';
 
 const API_URL = window.location.hostname === 'localhost' 
   ? 'http://localhost:3000/api'
@@ -312,7 +313,7 @@ function App() {
         <div className="sidebar-header">
           <div className="logo">
             <div className="logo-icon">
-            <img src="frontend\src\assets\national-university-philippines-logo-png_seeklogo-499282-removebg-preview.png" alt="NU Laguna Logo" />
+            <img src={nuLogo} alt="NU Laguna Logo"/>
             </div>
             <div className="logo-text">
               <div className="logo-title">NU Laguna</div>
@@ -859,13 +860,19 @@ function App() {
                 className={`tab ${scheduleView === 'section' ? 'active' : ''}`}
                 onClick={() => setScheduleView('section')}
               >
-                By Section
+               By Section
               </button>
               <button 
                 className={`tab ${scheduleView === 'room' ? 'active' : ''}`}
                 onClick={() => setScheduleView('room')}
               >
                 By Room
+              </button>
+              <button 
+                className={`tab ${scheduleView === 'mastergrid' ? 'active' : ''}`}
+                onClick={() => setScheduleView('mastergrid')}
+              >
+                By Master Grid
               </button>
             </div>
 
@@ -942,7 +949,47 @@ function App() {
                 </div>
               </div>
             ))}
-
+            {scheduleView === 'mastergrid' && (
+              <div className="card">
+                <h3 className="card-header">Master Schedule Grid - All Schedules</h3>
+                <div className="table-responsive">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Section</th>
+                        <th>Course Code</th>
+                        <th>Course Name</th>
+                        <th>Type</th>
+                        <th>Days</th>
+                        <th>Time</th>
+                        <th>Room</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {schedules.map(schedule => (
+                        <tr key={schedule.id}>
+                          <td>
+                            <strong>
+                              {schedule.program_code}{schedule.year_level}{schedule.section_letter}
+                            </strong>
+                          </td>
+                          <td><strong>{schedule.course_code}</strong></td>
+                          <td>{schedule.course_name}</td>
+                          <td>
+                            <span className={`badge badge-${schedule.schedule_type}`}>
+                              {schedule.schedule_type}
+                            </span>
+                          </td>
+                          <td>{schedule.day_pattern}</td>
+                          <td>{formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}</td>
+                          <td>{schedule.room_name}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
             {schedules.length === 0 && (
               <div className="alert alert-info">
                 <p>No schedules generated yet. Go to Generate Schedule to create one.</p>
