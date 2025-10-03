@@ -18,6 +18,7 @@ function App() {
   const [conflicts, setConflicts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [dbConnected, setDbConnected] = useState(true);
+  const [theme, setTheme] = useState('light');
 
   const [enrollmentData, setEnrollmentData] = useState([]);
   const [newCourse, setNewCourse] = useState({
@@ -38,7 +39,14 @@ function App() {
     loadCourses();
     loadRooms();
     loadSchedules();
+    document.documentElement.setAttribute('data-theme', 'light');
   }, []);
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    document.documentElement.setAttribute('data-theme', newTheme);
+  };
 
   const loadPrograms = async () => {
     try {
@@ -303,7 +311,9 @@ function App() {
       <aside className="sidebar">
         <div className="sidebar-header">
           <div className="logo">
-            <div className="logo-icon">NU</div>
+            <div className="logo-icon">
+            <img src="frontend\src\assets\national-university-philippines-logo-png_seeklogo-499282-removebg-preview.png" alt="NU Laguna Logo" />
+            </div>
             <div className="logo-text">
               <div className="logo-title">NU Laguna</div>
               <div className="logo-subtitle">Scheduling System</div>
@@ -317,48 +327,62 @@ function App() {
             className={`nav-item ${activePage === 'dashboard' ? 'active' : ''}`}
             onClick={() => setActivePage('dashboard')}
           >
-            <span className="nav-icon">📊</span>
             <span>Dashboard</span>
           </button>
           <button 
             className={`nav-item ${activePage === 'enrollment' ? 'active' : ''}`}
             onClick={() => setActivePage('enrollment')}
           >
-            <span className="nav-icon">👥</span>
             <span>Enrollment</span>
           </button>
           <button 
             className={`nav-item ${activePage === 'courses' ? 'active' : ''}`}
             onClick={() => setActivePage('courses')}
           >
-            <span className="nav-icon">📚</span>
             <span>Courses</span>
           </button>
           <button 
             className={`nav-item ${activePage === 'rooms' ? 'active' : ''}`}
             onClick={() => setActivePage('rooms')}
           >
-            <span className="nav-icon">🏛️</span>
             <span>Rooms</span>
           </button>
           <button 
             className={`nav-item ${activePage === 'generate' ? 'active' : ''}`}
             onClick={() => setActivePage('generate')}
           >
-            <span className="nav-icon">⚡</span>
             <span>Generate Schedule</span>
           </button>
           <button 
             className={`nav-item ${activePage === 'view-schedules' ? 'active' : ''}`}
             onClick={() => setActivePage('view-schedules')}
           >
-            <span className="nav-icon">📅</span>
             <span>View Schedules</span>
           </button>
         </nav>
       </aside>
 
       <main className="main-content">
+        <button className="theme-toggle" onClick={toggleTheme}>
+          {theme === 'light' ? (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+          )}
+        </button>
+        
         {activePage === 'dashboard' && (
           <div className="page">
             <div className="page-header">
@@ -370,30 +394,21 @@ function App() {
 
             <div className="stats-grid">
               <div className="stat-card">
-                <div className="stat-icon">📋</div>
-                <div className="stat-content">
-                  <div className="stat-label">Total Sections</div>
-                  <div className="stat-value">{sections.length}</div>
-                  <div className="stat-description">Across all programs and year levels</div>
-                </div>
+                <div className="stat-label">Total Sections</div>
+                <div className="stat-value">{sections.length}</div>
+                <div className="stat-description">Across all programs and year levels</div>
               </div>
 
               <div className="stat-card">
-                <div className="stat-icon">🏛️</div>
-                <div className="stat-content">
-                  <div className="stat-label">Available Rooms</div>
-                  <div className="stat-value">{rooms.length}</div>
-                  <div className="stat-description">{lectureRoomsCount} Lecture · {labRoomsCount} Laboratory</div>
-                </div>
+                <div className="stat-label">Available Rooms</div>
+                <div className="stat-value">{rooms.length}</div>
+                <div className="stat-description">{lectureRoomsCount} Lecture · {labRoomsCount} Laboratory</div>
               </div>
 
               <div className="stat-card">
-                <div className="stat-icon">✅</div>
-                <div className="stat-content">
-                  <div className="stat-label">Schedules Generated</div>
-                  <div className="stat-value">{schedules.length > 0 ? 'Yes' : 'No'}</div>
-                  <div className="stat-description">{schedules.length} schedule entries</div>
-                </div>
+                <div className="stat-label">Schedules Generated</div>
+                <div className="stat-value">{schedules.length > 0 ? 'Yes' : 'No'}</div>
+                <div className="stat-description">{schedules.length} schedule entries</div>
               </div>
             </div>
 
@@ -407,21 +422,18 @@ function App() {
                     className="quick-action-btn"
                     onClick={() => setActivePage('enrollment')}
                   >
-                    <span className="quick-action-icon">📝</span>
                     <span>Input Enrollment Data</span>
                   </button>
                   <button 
                     className="quick-action-btn"
                     onClick={() => setActivePage('courses')}
                   >
-                    <span className="quick-action-icon">📚</span>
                     <span>Manage Courses</span>
                   </button>
                   <button 
                     className="quick-action-btn primary"
                     onClick={() => setActivePage('generate')}
                   >
-                    <span className="quick-action-icon">⚡</span>
                     <span>Generate New Schedule</span>
                   </button>
                 </div>
