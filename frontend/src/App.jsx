@@ -850,7 +850,7 @@ function App() {
                 <p className="page-subtitle">Browse schedules by section or room</p>
               </div>
               <button className="btn btn-success" onClick={exportToExcel}>
-                📥 Export to Excel
+                Export to Excel
               </button>
             </div>
 

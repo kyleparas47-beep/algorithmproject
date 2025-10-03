@@ -10,7 +10,7 @@
 :root[data-theme="light"] {
   --primary: #36408b;
   --primary-hover: #4F46E5;
-  --sidebar-bg: #F3F4F6;
+  --sidebar-bg: #d9d9d9;
   --sidebar-text: #6B7280;
   --sidebar-active: #36408b;
   --bg-main: #FFFFFF;
