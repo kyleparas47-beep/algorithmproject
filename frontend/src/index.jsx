@@ -321,43 +321,30 @@ function App() {
             </div>
           </div>
         </div>
-
         <nav className="sidebar-nav">
           <div className="nav-section">Navigation</div>
           <button 
-            className={`nav-item ${activePage === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setActivePage('dashboard')}
-          >
+            className={`nav-item ${activePage === 'dashboard' ? 'active' : ''}`} onClick={() => setActivePage('dashboard')}>
             <span>Dashboard</span>
           </button>
           <button 
-            className={`nav-item ${activePage === 'enrollment' ? 'active' : ''}`}
-            onClick={() => setActivePage('enrollment')}
-          >
+            className={`nav-item ${activePage === 'enrollment' ? 'active' : ''}`} onClick={() => setActivePage('enrollment')}>
             <span>Enrollment</span>
           </button>
           <button 
-            className={`nav-item ${activePage === 'courses' ? 'active' : ''}`}
-            onClick={() => setActivePage('courses')}
-          >
+            className={`nav-item ${activePage === 'courses' ? 'active' : ''}`} onClick={() => setActivePage('courses')}>
             <span>Courses</span>
           </button>
           <button 
-            className={`nav-item ${activePage === 'rooms' ? 'active' : ''}`}
-            onClick={() => setActivePage('rooms')}
-          >
+            className={`nav-item ${activePage === 'rooms' ? 'active' : ''}`} onClick={() => setActivePage('rooms')}>
             <span>Rooms</span>
           </button>
           <button 
-            className={`nav-item ${activePage === 'generate' ? 'active' : ''}`}
-            onClick={() => setActivePage('generate')}
-          >
+            className={`nav-item ${activePage === 'generate' ? 'active' : ''}`} onClick={() => setActivePage('generate')}>
             <span>Generate Schedule</span>
           </button>
           <button 
-            className={`nav-item ${activePage === 'view-schedules' ? 'active' : ''}`}
-            onClick={() => setActivePage('view-schedules')}
-          >
+            className={`nav-item ${activePage === 'view-schedules' ? 'active' : ''}`} onClick={() => setActivePage('view-schedules')}>
             <span>View Schedules</span>
           </button>
         </nav>
@@ -392,49 +379,38 @@ function App() {
                 <p className="page-subtitle">Welcome to the NU Laguna Academic Scheduling System</p>
               </div>
             </div>
-
             <div className="stats-grid">
               <div className="stat-card">
                 <div className="stat-label">Total Sections</div>
                 <div className="stat-value">{sections.length}</div>
                 <div className="stat-description">Across all programs and year levels</div>
               </div>
-
               <div className="stat-card">
                 <div className="stat-label">Available Rooms</div>
                 <div className="stat-value">{rooms.length}</div>
                 <div className="stat-description">{lectureRoomsCount} Lecture · {labRoomsCount} Laboratory</div>
               </div>
-
               <div className="stat-card">
                 <div className="stat-label">Schedules Generated</div>
                 <div className="stat-value">{schedules.length > 0 ? 'Yes' : 'No'}</div>
                 <div className="stat-description">{schedules.length} schedule entries</div>
               </div>
             </div>
-
             <div className="dashboard-grid">
               <div className="dashboard-card">
                 <h2 className="card-title">Quick Actions</h2>
                 <p className="card-subtitle">Get started with scheduling</p>
-                
                 <div className="quick-actions">
                   <button 
-                    className="quick-action-btn"
-                    onClick={() => setActivePage('enrollment')}
-                  >
+                    className="quick-action-btn" onClick={() => setActivePage('enrollment')}>
                     <span>Input Enrollment Data</span>
                   </button>
                   <button 
-                    className="quick-action-btn"
-                    onClick={() => setActivePage('courses')}
-                  >
+                    className="quick-action-btn" onClick={() => setActivePage('courses')}>
                     <span>Manage Courses</span>
                   </button>
                   <button 
-                    className="quick-action-btn primary"
-                    onClick={() => setActivePage('generate')}
-                  >
+                    className="quick-action-btn primary" onClick={() => setActivePage('generate')}>
                     <span>Generate New Schedule</span>
                   </button>
                 </div>
@@ -449,7 +425,7 @@ function App() {
                     <div className="step-number">1</div>
                     <div className="step-content">
                       <div className="step-title">Input Enrollment</div>
-                      <div className="step-description">Enter student counts to generate sections</div>
+                      <div className="step-description">Enter number of student per year Level to generate sections</div>
                     </div>
                   </div>
                   <div className="step">
@@ -479,7 +455,7 @@ function App() {
 
             {!dbConnected && programs.length === 0 && (
               <div className="alert alert-warning">
-                <strong>⚠️ Database not connected</strong>
+                <strong> Database not connected</strong>
                 <p>Please set up MySQL in XAMPP and run the database.sql file. See SETUP.md for instructions.</p>
               </div>
             )}
@@ -512,8 +488,7 @@ function App() {
                               value={enrollment?.total_students || 0}
                               onChange={(e) => handleEnrollmentChange(program.id, year, e.target.value)}
                               placeholder="Number of students"
-                              className="input"
-                            />
+                              className="input"/>
                           </div>
                         );
                       })}
@@ -531,8 +506,7 @@ function App() {
               <button 
                 className="btn btn-primary" 
                 onClick={generateSections}
-                disabled={loading}
-              >
+                disabled={loading}>
                 {loading ? 'Generating...' : 'Generate Sections'}
               </button>
             </div>
@@ -580,10 +554,7 @@ function App() {
                 <div className="form-group">
                   <label>Program</label>
                   <select
-                    value={newCourse.program_id}
-                    onChange={(e) => setNewCourse({...newCourse, program_id: e.target.value})}
-                    className="input"
-                  >
+                    value={newCourse.program_id} onChange={(e) => setNewCourse({...newCourse, program_id: e.target.value})} className="input">
                     <option value="">Select Program</option>
                     {programs.map(p => (
                       <option key={p.id} value={p.id}>{p.code}</option>
@@ -593,10 +564,7 @@ function App() {
                 <div className="form-group">
                   <label>Year Level</label>
                   <select
-                    value={newCourse.year_level}
-                    onChange={(e) => setNewCourse({...newCourse, year_level: parseInt(e.target.value)})}
-                    className="input"
-                  >
+                    value={newCourse.year_level} onChange={(e) => setNewCourse({...newCourse, year_level: parseInt(e.target.value)})} className="input">
                     {[1, 2, 3, 4].map(y => (
                       <option key={y} value={y}>Year {y}</option>
                     ))}
@@ -605,30 +573,17 @@ function App() {
                 <div className="form-group">
                   <label>Course Code</label>
                   <input
-                    type="text"
-                    value={newCourse.code}
-                    onChange={(e) => setNewCourse({...newCourse, code: e.target.value})}
-                    placeholder="e.g., IT101"
-                    className="input"
-                  />
+                    type="text" value={newCourse.code} onChange={(e) => setNewCourse({...newCourse, code: e.target.value})} placeholder="e.g., IT101" className="input"/>
                 </div>
                 <div className="form-group">
                   <label>Course Name</label>
                   <input
-                    type="text"
-                    value={newCourse.name}
-                    onChange={(e) => setNewCourse({...newCourse, name: e.target.value})}
-                    placeholder="e.g., Programming 1"
-                    className="input"
-                  />
+                    type="text" value={newCourse.name} onChange={(e) => setNewCourse({...newCourse, name: e.target.value})} placeholder="e.g., Programming 1" className="input"/>
                 </div>
                 <div className="form-group">
                   <label>Type</label>
                   <select
-                    value={newCourse.type}
-                    onChange={(e) => setNewCourse({...newCourse, type: e.target.value})}
-                    className="input"
-                  >
+                    value={newCourse.type} onChange={(e) => setNewCourse({...newCourse, type: e.target.value})} className="input">
                     <option value="lecture">Lecture (4 hrs)</option>
                     <option value="leclab">Lecture + Lab (2.67 + 4 hrs)</option>
                   </select>
@@ -674,8 +629,7 @@ function App() {
                         <td>
                           <button 
                             className="btn btn-danger btn-sm" 
-                            onClick={() => deleteCourse(course.id)}
-                          >
+                            onClick={() => deleteCourse(course.id)}>
                             Delete
                           </button>
                         </td>
@@ -701,28 +655,19 @@ function App() {
                 <div className="form-group">
                   <label>Room Name</label>
                   <input
-                    type="text"
-                    value={newRoom.name}
-                    onChange={(e) => setNewRoom({...newRoom, name: e.target.value})}
-                    placeholder="e.g., CompLab 1"
-                    className="input"
-                  />
+                    type="text" value={newRoom.name} onChange={(e) => setNewRoom({...newRoom, name: e.target.value})} placeholder="e.g., CompLab 1" className="input"/>
                 </div>
                 <div className="form-group">
                   <label>Room Type</label>
                   <select
-                    value={newRoom.type}
-                    onChange={(e) => setNewRoom({...newRoom, type: e.target.value})}
-                    className="input"
-                  >
+                    value={newRoom.type} onChange={(e) => setNewRoom({...newRoom, type: e.target.value})} className="input">
                     <option value="lecture">Lecture Room</option>
                     <option value="laboratory">Laboratory</option>
                   </select>
                 </div>
               </div>
               <div className="card-actions">
-                <button className="btn btn-primary" onClick={addRoom} disabled={loading}>
-                  {loading ? 'Adding...' : 'Add Room'}
+                <button className="btn btn-primary" onClick={addRoom} disabled={loading}> {loading ? 'Adding...' : 'Add Room'}
                 </button>
               </div>
             </div>
@@ -754,8 +699,7 @@ function App() {
                         <td>
                           <button 
                             className="btn btn-danger btn-sm" 
-                            onClick={() => deleteRoom(room.id)}
-                          >
+                            onClick={() => deleteRoom(room.id)}>
                             Delete
                           </button>
                         </td>
@@ -807,10 +751,7 @@ function App() {
 
             <div className="page-actions">
               <button 
-                className="btn btn-primary btn-lg" 
-                onClick={generateSchedule}
-                disabled={loading || sections.length === 0 || courses.length === 0 || rooms.length === 0}
-              >
+                className="btn btn-primary btn-lg"  onClick={generateSchedule} disabled={loading || sections.length === 0 || courses.length === 0 || rooms.length === 0}>
                 {loading ? 'Generating Schedule...' : 'Generate Complete Schedule'}
               </button>
             </div>
@@ -857,21 +798,15 @@ function App() {
 
             <div className="tabs">
               <button 
-                className={`tab ${scheduleView === 'section' ? 'active' : ''}`}
-                onClick={() => setScheduleView('section')}
-              >
+                className={`tab ${scheduleView === 'section' ? 'active' : ''}`} onClick={() => setScheduleView('section')}>
                By Section
               </button>
               <button 
-                className={`tab ${scheduleView === 'room' ? 'active' : ''}`}
-                onClick={() => setScheduleView('room')}
-              >
+                className={`tab ${scheduleView === 'room' ? 'active' : ''}`} onClick={() => setScheduleView('room')}> 
                 By Room
               </button>
               <button 
-                className={`tab ${scheduleView === 'mastergrid' ? 'active' : ''}`}
-                onClick={() => setScheduleView('mastergrid')}
-              >
+                className={`tab ${scheduleView === 'mastergrid' ? 'active' : ''}`} onClick={() => setScheduleView('mastergrid')}>
                 By Master Grid
               </button>
             </div>

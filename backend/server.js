@@ -206,13 +206,13 @@ app.get('/api/schedules', async (req, res) => {
                 p.code as program_code,
                 r.name as room_name,
                 r.type as room_type
-            FROM schedules sch
-            JOIN courses c ON sch.course_id = c.id
-            JOIN sections s ON sch.section_id = s.id
-            JOIN programs p ON s.program_id = p.id
-            JOIN rooms r ON sch.room_id = r.id
-            ORDER BY p.code, s.year_level, s.letter, sch.day_pattern, sch.start_time
-        `);
+                FROM schedules sch
+                JOIN courses c ON sch.course_id = c.id
+                JOIN sections s ON sch.section_id = s.id
+                JOIN programs p ON s.program_id = p.id
+                JOIN rooms r ON sch.room_id = r.id
+                ORDER BY p.code, s.year_level, s.letter, sch.day_pattern, sch.start_time
+            `);
         res.json(schedules);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -227,13 +227,13 @@ app.get('/api/schedules/by-section/:sectionId', async (req, res) => {
                 c.code as course_code,
                 c.name as course_name,
                 r.name as room_name
-            FROM schedules sch
-            JOIN courses c ON sch.course_id = c.id
-            JOIN rooms r ON sch.room_id = r.id
-            WHERE sch.section_id = ?
-            ORDER BY sch.day_pattern, sch.start_time
-        `, [req.params.sectionId]);
-        res.json(schedules);
+                FROM schedules sch
+                JOIN courses c ON sch.course_id = c.id
+                JOIN rooms r ON sch.room_id = r.id
+                WHERE sch.section_id = ?
+                ORDER BY sch.day_pattern, sch.start_time
+            `, [req.params.sectionId]);
+            res.json(schedules);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -249,14 +249,14 @@ app.get('/api/schedules/by-room/:roomId', async (req, res) => {
                 s.year_level,
                 s.letter as section_letter,
                 p.code as program_code
-            FROM schedules sch
-            JOIN courses c ON sch.course_id = c.id
-            JOIN sections s ON sch.section_id = s.id
-            JOIN programs p ON s.program_id = p.id
-            WHERE sch.room_id = ?
-            ORDER BY sch.day_pattern, sch.start_time
-        `, [req.params.roomId]);
-        res.json(schedules);
+                FROM schedules sch
+                JOIN courses c ON sch.course_id = c.id
+                JOIN sections s ON sch.section_id = s.id
+                JOIN programs p ON s.program_id = p.id
+                WHERE sch.room_id = ?
+                ORDER BY sch.day_pattern, sch.start_time
+            `, [req.params.roomId]);
+            res.json(schedules);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
