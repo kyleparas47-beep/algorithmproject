@@ -395,26 +395,6 @@ function App() {
                 <div className="stat-value">{schedules.length > 0 ? 'Yes' : 'No'}</div>
                 <div className="stat-description">{schedules.length} schedule entries</div>
               </div>
-            </div>
-            <div className="dashboard-grid">
-              <div className="dashboard-card">
-                <h2 className="card-title">Quick Actions</h2>
-                <p className="card-subtitle">Get started with scheduling</p>
-                <div className="quick-actions">
-                  <button 
-                    className="quick-action-btn" onClick={() => setActivePage('enrollment')}>
-                    <span>Input Enrollment Data</span>
-                  </button>
-                  <button 
-                    className="quick-action-btn" onClick={() => setActivePage('courses')}>
-                    <span>Manage Courses</span>
-                  </button>
-                  <button 
-                    className="quick-action-btn primary" onClick={() => setActivePage('generate')}>
-                    <span>Generate New Schedule</span>
-                  </button>
-                </div>
-              </div>
 
               <div className="dashboard-card">
                 <h2 className="card-title">Getting Started</h2>
@@ -466,7 +446,6 @@ function App() {
           <div className="page">
             <div className="page-header">
               <h1 className="page-title">Enrollment</h1>
-              <p className="page-subtitle">Input student numbers to generate sections</p>
             </div>
 
             {Array.isArray(programs) && programs.length > 0 ? (
@@ -545,7 +524,6 @@ function App() {
           <div className="page">
             <div className="page-header">
               <h1 className="page-title">Courses</h1>
-              <p className="page-subtitle">Manage lecture and lab courses</p>
             </div>
 
             <div className="card">
@@ -646,7 +624,6 @@ function App() {
           <div className="page">
             <div className="page-header">
               <h1 className="page-title">Rooms</h1>
-              <p className="page-subtitle">Manage lecture and laboratory rooms</p>
             </div>
 
             <div className="card">
@@ -716,7 +693,6 @@ function App() {
           <div className="page">
             <div className="page-header">
               <h1 className="page-title">Generate Schedule</h1>
-              <p className="page-subtitle">Run the greedy algorithm to create schedules</p>
             </div>
 
             <div className="stats-grid">
@@ -736,17 +712,6 @@ function App() {
                 <div className="stat-label">Lab Rooms</div>
                 <div className="stat-value">{labRoomsCount}</div>
               </div>
-            </div>
-
-            <div className="card">
-              <h3 className="card-header">Scheduling Algorithm</h3>
-              <ul className="info-list">
-                <li>Prioritizes Lecture+Lab courses (harder to schedule)</li>
-                <li>Handles two time slot options for flexibility</li>
-                <li>Ensures no room or section conflicts</li>
-                <li>Respects room types (lecture vs laboratory)</li>
-                <li>Operates within 7:00 AM - 9:00 PM, Monday-Saturday</li>
-              </ul>
             </div>
 
             <div className="page-actions">

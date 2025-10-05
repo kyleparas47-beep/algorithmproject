@@ -284,43 +284,6 @@ body {
   margin-bottom: 1.5rem;
 }
 
-.quick-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.quick-action-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1rem;
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-primary);
-  transition: all 0.2s;
-  text-align: left;
-}
-
-.quick-action-btn:hover {
-  background: var(--hover-bg);
-  border-color: var(--primary);
-}
-
-.quick-action-btn.primary {
-  background: var(--primary);
-  color: white;
-  border-color: var(--primary);
-}
-
-.quick-action-btn.primary:hover {
-  background: var(--primary-hover);
-}
-
 .getting-started {
   display: flex;
   flex-direction: column;
@@ -577,7 +540,7 @@ body {
 
 .alert-info {
   background: rgba(59, 130, 246, 0.1);
-  border-color: #3B82F6;
+  border-color: #36408b;
   color: var(--text-primary);
 }
 
