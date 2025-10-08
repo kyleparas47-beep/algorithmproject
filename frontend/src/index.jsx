@@ -6,7 +6,7 @@ import nuLogo from './assets/national-university-philippines-logo-png_seeklogo-4
 
 const API_URL = window.location.hostname === 'localhost' 
   ? 'http://localhost:3000/api'
-  : `https://${window.location.hostname.replace('5000', '3000')}/api`;
+  : '/api';
 
 function App() {
   const [activePage, setActivePage] = useState('dashboard');
@@ -153,10 +153,13 @@ function App() {
 
     setLoading(true);
     try {
+      const selectedProgram = programs.find(p => p.id === parseInt(newCourse.program_id));
+      const isIT = selectedProgram?.code === 'BSIT';
+      
       const courseData = {
         ...newCourse,
-        hours_lecture: newCourse.type === 'lecture' ? 4 : 2.67,
-        hours_lab: newCourse.type === 'leclab' ? 4 : 0
+        hours_lecture: newCourse.type === 'lecture' ? (isIT ? 2 : 4) : (newCourse.type === 'laboratory' ? 0 : (isIT ? 2 : 2.67)),
+        hours_lab: newCourse.type === 'laboratory' ? 2 : (newCourse.type === 'leclab' ? (isIT ? 2 : 4) : 0)
       };
 
       await axios.post(`${API_URL}/courses`, { courses: [courseData] });
@@ -562,8 +565,13 @@ function App() {
                   <label>Type</label>
                   <select
                     value={newCourse.type} onChange={(e) => setNewCourse({...newCourse, type: e.target.value})} className="input">
-                    <option value="lecture">Lecture (4 hrs)</option>
-                    <option value="leclab">Lecture + Lab (2.67 + 4 hrs)</option>
+                    {programs.find(p => p.id === parseInt(newCourse.program_id))?.code === 'BSIT' ? (<>
+                        <option value="lecture">Lecture (2 hrs)</option>
+                        <option value="laboratory">Laboratory (2 hrs)</option></>
+                    ) : (<>
+                        <option value="lecture">Lecture (4 hrs)</option>
+                        <option value="leclab">Lecture + Lab (2.67 + 4 hrs)</option></>
+                    )}
                   </select>
                 </div>
               </div>
@@ -598,11 +606,14 @@ function App() {
                         <td>Year {course.year_level}</td>
                         <td>
                           <span className={`badge badge-${course.type}`}>
-                            {course.type === 'lecture' ? 'Lecture' : 'Lec+Lab'}
+                            {course.type === 'lecture' ? 'Lecture' : (course.type === 'laboratory' ? 'Laboratory' : 'Lec+Lab')}
                           </span>
                         </td>
                         <td>
-                          {course.type === 'lecture' ? '4 hrs' : '2.67 + 4 hrs'}
+                          {course.program_code === 'BSIT' 
+                            ? (course.type === 'lecture' ? '2 hrs' : (course.type === 'laboratory' ? '2 hrs' : '2 + 2 hrs'))
+                            : (course.type === 'lecture' ? '4 hrs' : '2.67 + 4 hrs')
+                          }
                         </td>
                         <td>
                           <button 

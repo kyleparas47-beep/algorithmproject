@@ -2,11 +2,12 @@ class ScheduleGenerator {
     constructor() {
         this.dayPatterns = {
             twoDay: [
+                ['Mon', 'Wed'],
+                ['Tue', 'Thu'],
                 ['Mon', 'Thu'],
                 ['Tue', 'Fri'],
                 ['Wed', 'Sat']
-            ],
-            oneDay: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+            ]
         };
     }
 
@@ -66,138 +67,185 @@ class ScheduleGenerator {
 
     scheduleCourseForSection(course, section, rooms, roomOccupancy, sectionOccupancy) {
         const schedules = [];
+        const programCode = course.program_code;
+        const isIT = programCode === 'BSIT';
         
         if (course.type === 'lecture') {
-            const hours = course.hours_lecture || 4;
-            const result = this.scheduleLecture(course, section, rooms, roomOccupancy, sectionOccupancy, hours);
+            const hours = course.hours_lecture || 2;
+            const result = this.scheduleLecture(course, section, rooms, roomOccupancy, sectionOccupancy, hours, programCode);
             if (!result.success) return result;
-            schedules.push(result.schedule);
+            schedules.push(...result.schedules);
+        } else if (course.type === 'laboratory') {
+            // For IT laboratory courses (2 hours lab only)
+            const hours = course.hours_lab || 2;
+            const result = this.scheduleLaboratory(course, section, rooms, roomOccupancy, sectionOccupancy, hours, programCode);
+            if (!result.success) return result;
+            schedules.push(...result.schedules);
         } else if (course.type === 'leclab') {
-            const lectureHours = course.hours_lecture || 2.67;
-            const lectureResult = this.scheduleLecture(course, section, rooms, roomOccupancy, sectionOccupancy, lectureHours);
-            if (!lectureResult.success) return lectureResult;
-            schedules.push(lectureResult.schedule);
+            // For IT: 2 hours lecture, 2 hours lab - split into 2 days
+            // For IS/CS: 2.67 hours lecture, 4 hours lab
+            const lectureHours = isIT ? 2 : (course.hours_lecture || 2.67);
+            const labHours = isIT ? 2 : (course.hours_lab || 4);
 
-            const labHours = course.hours_lab || 4;
-            const labResult = this.scheduleLab(course, section, rooms, roomOccupancy, sectionOccupancy, labHours);
-            if (!labResult.success) {
-                this.releaseTimeSlot(lectureResult.schedule, roomOccupancy, sectionOccupancy);
-                return labResult;
-            }
-            schedules.push(labResult.schedule);
+            // Try to schedule lecture and lab on the same days
+            const result = this.scheduleLecLab(course, section, rooms, roomOccupancy, sectionOccupancy, lectureHours, labHours, programCode);
+            
+            if (!result.success) return result;
+            schedules.push(...result.schedules);
         }
 
         return { success: true, schedules };
     }
 
-    scheduleLecture(course, section, rooms, roomOccupancy, sectionOccupancy, hours) {
+    scheduleLecLab(course, section, rooms, roomOccupancy, sectionOccupancy, lectureHours, labHours, programCode) {
+        const isIT = programCode === 'BSIT';
         const lectureRooms = rooms.filter(r => r.type === 'lecture');
-        
-        for (const room of lectureRooms) {
-            const slot = this.findAvailableSlot(room, section, hours, roomOccupancy, sectionOccupancy);
-            if (slot) {
-                const schedule = {
-                    section_id: section.id,
-                    course_id: course.id,
-                    room_id: room.id,
-                    day_pattern: slot.dayPattern,
-                    start_time: slot.startTime,
-                    end_time: slot.endTime,
-                    schedule_type: 'lecture'
-                };
-                this.markTimeSlot(schedule, roomOccupancy, sectionOccupancy);
-                return { success: true, schedule };
-            }
-        }
-
-        return { 
-            success: false, 
-            reason: 'No available lecture room slot found' 
-        };
-    }
-
-    scheduleLab(course, section, rooms, roomOccupancy, sectionOccupancy, hours) {
         const labRooms = rooms.filter(r => r.type === 'laboratory');
+
+        // For IT: 2 hours per session, 2 days
+        // For IS/CS: lecture split, lab split into 2-hour sessions
         
-        for (const room of labRooms) {
-            const slot = this.findAvailableSlot(room, section, hours, roomOccupancy, sectionOccupancy);
-            if (slot) {
-                const schedule = {
-                    section_id: section.id,
-                    course_id: course.id,
-                    room_id: room.id,
-                    day_pattern: slot.dayPattern,
-                    start_time: slot.startTime,
-                    end_time: slot.endTime,
-                    schedule_type: 'lab'
-                };
-                this.markTimeSlot(schedule, roomOccupancy, sectionOccupancy);
-                return { success: true, schedule };
+        for (const dayPattern of this.dayPatterns.twoDay) {
+            // Try to find lecture rooms for both days
+            const lectureSchedules = [];
+            const labSchedules = [];
+            const hoursPerLectureSession = isIT ? 2 : (lectureHours / 2); // IT: 2 hours, IS/CS: 1.34 hours
+            const hoursPerLabSession = 2; // Always 2 hours per lab session
+
+            let lectureRoomFound = null;
+            let labRoomFound = null;
+
+            // Find lecture room slots
+            for (const lectureRoom of lectureRooms) {
+                const lectureSlots = this.findTwoDaySlots(
+                    lectureRoom, 
+                    section, 
+                    dayPattern, 
+                    hoursPerLectureSession, 
+                    roomOccupancy, 
+                    sectionOccupancy
+                );
+                
+                if (lectureSlots) {
+                    lectureRoomFound = lectureRoom;
+                    
+                    // Create lecture schedules for both days
+                    lectureSlots.forEach((slot, index) => {
+                        lectureSchedules.push({
+                            section_id: section.id,
+                            course_id: course.id,
+                            room_id: lectureRoom.id,
+                            day_pattern: dayPattern[index],
+                            start_time: slot.startTime,
+                            end_time: slot.endTime,
+                            schedule_type: 'lecture'
+                        });
+                    });
+                    break;
+                }
+            }
+
+            if (!lectureRoomFound) continue;
+
+            // Find lab room slots on the same days, preferably after lecture
+            for (const labRoom of labRooms) {
+                const labSlots = this.findTwoDaySlots(
+                    labRoom, 
+                    section, 
+                    dayPattern, 
+                    hoursPerLabSession, 
+                    roomOccupancy, 
+                    sectionOccupancy,
+                    lectureSchedules // Pass lecture schedules to prefer scheduling after them
+                );
+                
+                if (labSlots) {
+                    labRoomFound = labRoom;
+                    
+                    // Create lab schedules for both days
+                    labSlots.forEach((slot, index) => {
+                        labSchedules.push({
+                            section_id: section.id,
+                            course_id: course.id,
+                            room_id: labRoom.id,
+                            day_pattern: dayPattern[index],
+                            start_time: slot.startTime,
+                            end_time: slot.endTime,
+                            schedule_type: 'lab'
+                        });
+                    });
+                    break;
+                }
+            }
+
+            if (lectureRoomFound && labRoomFound) {
+                // Mark all time slots
+                [...lectureSchedules, ...labSchedules].forEach(schedule => {
+                    this.markTimeSlot(schedule, roomOccupancy, sectionOccupancy);
+                });
+                
+                return { success: true, schedules: [...lectureSchedules, ...labSchedules] };
+            } else if (lectureRoomFound) {
+                // Release lecture slots if lab couldn't be scheduled
+                lectureSchedules.forEach(schedule => {
+                    this.releaseTimeSlot(schedule, roomOccupancy, sectionOccupancy);
+                });
             }
         }
 
         return { 
             success: false, 
-            reason: 'No available laboratory room slot found' 
+            reason: 'No available slots for lecture and lab on same days' 
         };
     }
 
-    findAvailableSlot(room, section, hours, roomOccupancy, sectionOccupancy) {
+    findTwoDaySlots(room, section, dayPattern, hoursPerDay, roomOccupancy, sectionOccupancy, preferAfter = null) {
         const availableDays = room.available_days.split(',');
+        
+        // Check if both days are available
+        if (!dayPattern.every(d => availableDays.includes(d))) {
+            return null;
+        }
+
         const roomStartHour = this.parseTimeToHours(room.start_time);
         const roomEndHour = this.parseTimeToHours(room.end_time);
-        
-        if (hours === 4) {
-            for (const dayPattern of this.dayPatterns.twoDay) {
-                if (dayPattern.every(d => availableDays.includes(d))) {
-                    const slot = this.tryTimeSlot(room, section, dayPattern, 2, roomOccupancy, sectionOccupancy, roomStartHour, roomEndHour);
-                    if (slot) return slot;
-                }
-            }
+        const slots = [];
 
-            for (const day of this.dayPatterns.oneDay) {
-                if (availableDays.includes(day)) {
-                    const slot = this.tryTimeSlot(room, section, [day], 4, roomOccupancy, sectionOccupancy, roomStartHour, roomEndHour);
-                    if (slot) return slot;
-                }
+        // Try to find slots for both days
+        for (let dayIndex = 0; dayIndex < dayPattern.length; dayIndex++) {
+            const day = dayPattern[dayIndex];
+            const preferAfterTime = preferAfter && preferAfter[dayIndex] ? preferAfter[dayIndex].end_time : null;
+            
+            const slot = this.findSlotForDay(
+                room, 
+                section, 
+                day, 
+                hoursPerDay, 
+                roomOccupancy, 
+                sectionOccupancy, 
+                roomStartHour, 
+                roomEndHour,
+                preferAfterTime
+            );
+            
+            if (!slot) {
+                return null; // If we can't find a slot for any day, fail
             }
-        } else if (hours >= 2.5 && hours <= 2.7) {
-            for (const day of this.dayPatterns.oneDay) {
-                if (availableDays.includes(day)) {
-                    const slot = this.tryTimeSlot(room, section, [day], 2.67, roomOccupancy, sectionOccupancy, roomStartHour, roomEndHour);
-                    if (slot) return slot;
-                }
-            }
-
-            for (const dayPattern of this.dayPatterns.twoDay) {
-                if (dayPattern.every(d => availableDays.includes(d))) {
-                    const slot = this.tryTimeSlot(room, section, dayPattern, 1.34, roomOccupancy, sectionOccupancy, roomStartHour, roomEndHour);
-                    if (slot) return slot;
-                }
-            }
-        } else {
-            for (const day of this.dayPatterns.oneDay) {
-                if (availableDays.includes(day)) {
-                    const slot = this.tryTimeSlot(room, section, [day], hours, roomOccupancy, sectionOccupancy, roomStartHour, roomEndHour);
-                    if (slot) return slot;
-                }
-            }
+            
+            slots.push(slot);
         }
 
-        return null;
+        return slots;
     }
 
-    parseTimeToHours(timeString) {
-        const [hours, minutes] = timeString.split(':').map(Number);
-        return hours + minutes / 60;
-    }
-
-    tryTimeSlot(room, section, days, hoursPerDay, roomOccupancy, sectionOccupancy, roomStartHour, roomEndHour) {
-        const minutes = Math.round(hoursPerDay * 60);
-        
+    findSlotForDay(room, section, day, hours, roomOccupancy, sectionOccupancy, roomStartHour, roomEndHour, preferAfter = null) {
+        const minutes = Math.round(hours * 60);
         const startHour = Math.floor(roomStartHour);
         const startMinute = Math.round((roomStartHour - startHour) * 60);
         const endHour = Math.floor(roomEndHour);
+
+        // If preferAfter is set, try slots after that time first
+        const timesToTry = [];
         
         for (let hour = startHour; hour < endHour; hour++) {
             const minuteStart = (hour === startHour) ? startMinute : 0;
@@ -212,17 +260,175 @@ class ScheduleGenerator {
 
                 const endTime = `${String(endHourCalc).padStart(2, '0')}:${String(endMinuteCalc).padStart(2, '0')}:00`;
 
-                if (this.isSlotAvailable(room.id, section.id, days, startTime, endTime, roomOccupancy, sectionOccupancy)) {
-                    return {
-                        dayPattern: days.join(''),
-                        startTime,
-                        endTime
-                    };
+                if (preferAfter && startTime <= preferAfter) {
+                    // Add to end of list if before preferred time
+                    timesToTry.push({ startTime, endTime, priority: 1 });
+                } else {
+                    // Add to beginning if after preferred time
+                    timesToTry.unshift({ startTime, endTime, priority: 0 });
                 }
             }
         }
 
+        // Sort by priority (after preferred time first)
+        timesToTry.sort((a, b) => a.priority - b.priority);
+
+        // Try each time slot
+        for (const { startTime, endTime } of timesToTry) {
+            if (this.isSlotAvailable(room.id, section.id, [day], startTime, endTime, roomOccupancy, sectionOccupancy)) {
+                return { startTime, endTime };
+            }
+        }
+
         return null;
+    }
+
+    scheduleLecture(course, section, rooms, roomOccupancy, sectionOccupancy, hours, programCode) {
+        const lectureRooms = rooms.filter(r => r.type === 'lecture');
+        const isIT = programCode === 'BSIT';
+        
+        // For standalone lectures, if IT and 2 hours, split into 2 days
+        if (isIT && hours === 2) {
+            for (const dayPattern of this.dayPatterns.twoDay) {
+                for (const lectureRoom of lectureRooms) {
+                    const slots = this.findTwoDaySlots(
+                        lectureRoom,
+                        section,
+                        dayPattern,
+                        1, // 1 hour per session
+                        roomOccupancy,
+                        sectionOccupancy
+                    );
+
+                    if (slots) {
+                        const schedules = slots.map((slot, index) => ({
+                            section_id: section.id,
+                            course_id: course.id,
+                            room_id: lectureRoom.id,
+                            day_pattern: dayPattern[index],
+                            start_time: slot.startTime,
+                            end_time: slot.endTime,
+                            schedule_type: 'lecture'
+                        }));
+
+                        schedules.forEach(schedule => {
+                            this.markTimeSlot(schedule, roomOccupancy, sectionOccupancy);
+                        });
+
+                        return { success: true, schedules };
+                    }
+                }
+            }
+        } else {
+            // Non-IT or different hours - use single day
+            for (const room of lectureRooms) {
+                const slot = this.findAvailableSlot(room, section, hours, roomOccupancy, sectionOccupancy);
+                if (slot) {
+                    const schedule = {
+                        section_id: section.id,
+                        course_id: course.id,
+                        room_id: room.id,
+                        day_pattern: slot.dayPattern,
+                        start_time: slot.startTime,
+                        end_time: slot.endTime,
+                        schedule_type: 'lecture'
+                    };
+                    this.markTimeSlot(schedule, roomOccupancy, sectionOccupancy);
+                    return { success: true, schedules: [schedule] };
+                }
+            }
+        }
+
+        return { 
+            success: false, 
+            reason: 'No available lecture room slot found' 
+        };
+    }
+
+    scheduleLaboratory(course, section, rooms, roomOccupancy, sectionOccupancy, hours, programCode) {
+        const labRooms = rooms.filter(r => r.type === 'laboratory');
+        const isIT = programCode === 'BSIT';
+        
+        // For IT laboratory courses, if 2 hours, split into 2 days
+        if (isIT && hours === 2) {
+            for (const dayPattern of this.dayPatterns.twoDay) {
+                for (const labRoom of labRooms) {
+                    const slots = this.findTwoDaySlots(
+                        labRoom,
+                        section,
+                        dayPattern,
+                        1, // 1 hour per session
+                        roomOccupancy,
+                        sectionOccupancy
+                    );
+
+                    if (slots) {
+                        const schedules = slots.map((slot, index) => ({
+                            section_id: section.id,
+                            course_id: course.id,
+                            room_id: labRoom.id,
+                            day_pattern: dayPattern[index],
+                            start_time: slot.startTime,
+                            end_time: slot.endTime,
+                            schedule_type: 'lab'
+                        }));
+
+                        schedules.forEach(schedule => {
+                            this.markTimeSlot(schedule, roomOccupancy, sectionOccupancy);
+                        });
+
+                        return { success: true, schedules };
+                    }
+                }
+            }
+        } else {
+            // Non-IT or different hours - use single day
+            for (const room of labRooms) {
+                const slot = this.findAvailableSlot(room, section, hours, roomOccupancy, sectionOccupancy);
+                if (slot) {
+                    const schedule = {
+                        section_id: section.id,
+                        course_id: course.id,
+                        room_id: room.id,
+                        day_pattern: slot.dayPattern,
+                        start_time: slot.startTime,
+                        end_time: slot.endTime,
+                        schedule_type: 'lab'
+                    };
+                    this.markTimeSlot(schedule, roomOccupancy, sectionOccupancy);
+                    return { success: true, schedules: [schedule] };
+                }
+            }
+        }
+
+        return { 
+            success: false, 
+            reason: 'No available laboratory room slot found' 
+        };
+    }
+
+    findAvailableSlot(room, section, hours, roomOccupancy, sectionOccupancy) {
+        const availableDays = room.available_days.split(',');
+        const roomStartHour = this.parseTimeToHours(room.start_time);
+        const roomEndHour = this.parseTimeToHours(room.end_time);
+        
+        for (const day of availableDays) {
+            const slot = this.findSlotForDay(room, section, day, hours, roomOccupancy, sectionOccupancy, roomStartHour, roomEndHour);
+            if (slot) {
+                return {
+                    dayPattern: day,
+                    startTime: slot.startTime,
+                    endTime: slot.endTime
+                };
+            }
+        }
+
+        return null;
+    }
+
+    parseTimeToHours(timeString) {
+        const [hours, minutes] = timeString.split(':').map(Number);
+        return hours + minutes / 60;
     }
 
     isSlotAvailable(roomId, sectionId, days, startTime, endTime, roomOccupancy, sectionOccupancy) {
@@ -254,7 +460,7 @@ class ScheduleGenerator {
     }
 
     markTimeSlot(schedule, roomOccupancy, sectionOccupancy) {
-        const days = this.parseDayPattern(schedule.day_pattern);
+        const days = [schedule.day_pattern];
         
         for (const day of days) {
             const roomKey = `${schedule.room_id}-${day}`;
@@ -278,7 +484,7 @@ class ScheduleGenerator {
     }
 
     releaseTimeSlot(schedule, roomOccupancy, sectionOccupancy) {
-        const days = this.parseDayPattern(schedule.day_pattern);
+        const days = [schedule.day_pattern];
         
         for (const day of days) {
             const roomKey = `${schedule.room_id}-${day}`;
@@ -295,18 +501,6 @@ class ScheduleGenerator {
                 );
             }
         }
-    }
-
-    parseDayPattern(pattern) {
-        if (pattern.length === 3) {
-            return [pattern];
-        }
-        
-        const days = [];
-        for (let i = 0; i < pattern.length; i += 3) {
-            days.push(pattern.substr(i, 3));
-        }
-        return days;
     }
 
     initializeOccupancy(rooms) {
