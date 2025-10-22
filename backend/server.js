@@ -79,9 +79,23 @@ app.post('/api/courses', async (req, res) => {
         const { courses } = req.body;
         
         for (const course of courses) {
+            // Get program details
+            const [program] = await db.query('SELECT code FROM programs WHERE id = ?', [course.program_id]);
+            
+            if (!program || program.length === 0) {
+                return res.status(400).json({ error: `Program with ID ${course.program_id} not found` });
+            }
+            
+            const programCode = program[0].code;
+            
+            // Validate that laboratory type is only for BSIT
+            if (course.type === 'laboratory' && programCode !== 'BSIT') {
+                return res.status(400).json({ error: `Laboratory type is only available for BSIT programs, not ${programCode}` });
+            }
+            
             await db.query(
-                'INSERT INTO courses (code, name, type, hours_lecture, hours_lab, program_id, year_level) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                [course.code, course.name, course.type, course.hours_lecture, course.hours_lab, course.program_id, course.year_level]
+                'INSERT INTO courses (code, name, type, hours_lecture, hours_lab, term, program_id, year_level) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                [course.code, course.name, course.type, course.hours_lecture, course.hours_lab, course.term || 'TERM 1', course.program_id, course.year_level]
             );
         }
         
@@ -100,6 +114,34 @@ app.get('/api/courses', async (req, res) => {
             ORDER BY p.code, c.year_level, c.code
         `);
         res.json(courses);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.put('/api/courses/:id', async (req, res) => {
+    try {
+        const { course } = req.body;
+        
+        // Get program details
+        const [program] = await db.query('SELECT code FROM programs WHERE id = ?', [course.program_id]);
+        
+        if (!program || program.length === 0) {
+            return res.status(400).json({ error: `Program with ID ${course.program_id} not found` });
+        }
+        
+        const programCode = program[0].code;
+        
+        // Validate that laboratory type is only for BSIT
+        if (course.type === 'laboratory' && programCode !== 'BSIT') {
+            return res.status(400).json({ error: `Laboratory type is only available for BSIT programs, not ${programCode}` });
+        }
+        
+        await db.query(
+            'UPDATE courses SET code = ?, name = ?, type = ?, hours_lecture = ?, hours_lab = ?, term = ?, program_id = ?, year_level = ? WHERE id = ?',
+            [course.code, course.name, course.type, course.hours_lecture, course.hours_lab, course.term, course.program_id, course.year_level, req.params.id]
+        );
+        res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -201,6 +243,7 @@ app.get('/api/schedules', async (req, res) => {
                 c.code as course_code,
                 c.name as course_name,
                 c.type as course_type,
+                c.term as course_term,
                 s.year_level,
                 s.letter as section_letter,
                 p.code as program_code,
@@ -211,7 +254,7 @@ app.get('/api/schedules', async (req, res) => {
                 JOIN sections s ON sch.section_id = s.id
                 JOIN programs p ON s.program_id = p.id
                 JOIN rooms r ON sch.room_id = r.id
-                ORDER BY p.code, s.year_level, s.letter, sch.day_pattern, sch.start_time
+                ORDER BY c.term, p.code, s.year_level, s.letter, sch.day_pattern, sch.start_time
             `);
         res.json(schedules);
     } catch (error) {
@@ -226,12 +269,13 @@ app.get('/api/schedules/by-section/:sectionId', async (req, res) => {
                 sch.*,
                 c.code as course_code,
                 c.name as course_name,
+                c.term as course_term,
                 r.name as room_name
                 FROM schedules sch
                 JOIN courses c ON sch.course_id = c.id
                 JOIN rooms r ON sch.room_id = r.id
                 WHERE sch.section_id = ?
-                ORDER BY sch.day_pattern, sch.start_time
+                ORDER BY c.term, sch.day_pattern, sch.start_time
             `, [req.params.sectionId]);
             res.json(schedules);
     } catch (error) {
@@ -246,6 +290,7 @@ app.get('/api/schedules/by-room/:roomId', async (req, res) => {
                 sch.*,
                 c.code as course_code,
                 c.name as course_name,
+                c.term as course_term,
                 s.year_level,
                 s.letter as section_letter,
                 p.code as program_code
@@ -254,9 +299,21 @@ app.get('/api/schedules/by-room/:roomId', async (req, res) => {
                 JOIN sections s ON sch.section_id = s.id
                 JOIN programs p ON s.program_id = p.id
                 WHERE sch.room_id = ?
-                ORDER BY sch.day_pattern, sch.start_time
+                ORDER BY c.term, p.code, s.year_level, s.letter, sch.day_pattern, sch.start_time
             `, [req.params.roomId]);
             res.json(schedules);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.delete('/api/schedules', async (req, res) => {
+    try {
+        await db.query('DELETE FROM schedules');
+        res.json({ 
+            success: true, 
+            message: 'All schedules deleted successfully'
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

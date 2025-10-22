@@ -429,6 +429,20 @@ body {
   cursor: not-allowed;
 }
 
+.btn-secondary {
+  background: var(--text-secondary);
+  color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #4B5563;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .btn-success {
   background: var(--success);
   color: white;
