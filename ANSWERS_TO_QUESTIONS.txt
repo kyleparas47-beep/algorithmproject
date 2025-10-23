@@ -1,0 +1,1317 @@
+================================================================================
+ANSWERS TO TECHNICAL QUESTIONS WITH CODE PROOF
+Course Scheduling System - NU Laguna Academic Scheduling
+================================================================================
+
+QUESTION 1: What algorithms, data structures, programming language, and other 
+            tools did you use in the project?
+================================================================================
+
+PROGRAMMING LANGUAGE & FRAMEWORK:
+----------------------------------
+- Backend: Node.js (JavaScript ES6+)
+- Frontend: React.js (JavaScript with JSX)
+- Database: MySQL 8.0+
+- Libraries: Express.js, Axios, XLSX, mysql2/promise
+
+ALGORITHMS USED:
+----------------
+
+1. GREEDY SLOT FINDING ALGORITHM
+   Location: backend/scheduler.js - findFlexibleSlots() function (lines 470-533)
+   
+   Description: Searches for available time slots by trying each day sequentially,
+   taking the first available slot on each day to ensure sessions are spread
+   across different days.
+   
+   CODE PROOF:
+   ```javascript
+   findFlexibleSlots(room, section, hoursPerSession, numSlotsNeeded, 
+                     roomOccupancy, sectionOccupancy) {
+       const availableSlots = [];
+       const usedDays = new Set();  // Track which days we've used
+       const minutes = Math.round(hoursPerSession * 60);
+       
+       const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+       
+       // Greedy approach: Take first available slot on each day
+       for (const day of days) {
+           // Skip day if already used (ensures different days)
+           if (usedDays.has(day) && availableSlots.length > 0) {
+               continue;
+           }
+           
+           for (let hour = startHour; hour < endHour; hour++) {
+               for (let minute = 0; minute < 60; minute += 30) {
+                   const slotStartTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
+                   const slotEndTime = // ... calculate end time
+                   
+                   if (this.isSlotAvailable(room.id, section.id, [day], 
+                                           slotStartTime, slotEndTime, 
+                                           roomOccupancy, sectionOccupancy)) {
+                       availableSlots.push({day, startTime: slotStartTime, endTime: slotEndTime});
+                       usedDays.add(day);  // Mark day as used
+                       break;  // Move to next day
+                   }
+               }
+               if (usedDays.has(day)) break;
+           }
+           
+           if (availableSlots.length >= numSlotsNeeded) {
+               return availableSlots;
+           }
+       }
+       
+       return availableSlots.length > 0 ? availableSlots : null;
+   }
+   ```
+   
+   Time Complexity: O(D × H × M) where:
+   - D = Days (6: Mon-Sat)
+   - H = Hours per day (14: 7am-9pm)
+   - M = Minutes granularity (30-minute intervals = 28 slots)
+   Total: ~2,352 operations per slot search
+
+2. HIERARCHICAL SCHEDULING ALGORITHM
+   Location: backend/scheduler.js - generateSchedules() function (lines 19-188)
+   
+   Description: Schedules courses using nested loops by Program → Term → Course,
+   with room occupancy reset between terms.
+   
+   CODE PROOF:
+   ```javascript
+   generateSchedules(sections, courses, rooms) {
+       const schedules = [];
+       const conflicts = [];
+       
+       const coursesByProgramTerm = this.groupCoursesByProgramAndTerm(courses, sections);
+       const programOrder = ['BSCS', 'BSIS', 'BSIT'];
+       const termOrder = ['TERM 1', 'TERM 2', 'TERM 3'];
+       
+       // Hierarchical loops: Program → Term → Course
+       for (const program of programOrder) {
+           for (const term of termOrder) {
+               // RESET ROOMS FOR THIS TERM
+               const roomOccupancy = this.initializeOccupancy(rooms);
+               const sectionOccupancy = this.initializeSectionOccupancyForProgram(programSections);
+               
+               const termCourses = coursesByProgramTerm[program][term] || [];
+               const sortedCourses = this.sortCoursesByPriority(termCourses, programSections);
+               
+               // Schedule each course
+               for (const course of sortedCourses) {
+                   const courseSections = programSections.filter(s => 
+                       s.year_level === course.year_level
+                   );
+                   
+                   for (const section of courseSections) {
+                       const result = this.scheduleCourseForSection(
+                           course, section, rooms, roomOccupancy, sectionOccupancy
+                       );
+                       
+                       if (result.success) {
+                           schedules.push(...result.schedules);
+                       } else {
+                           conflicts.push({/* conflict info */});
+                       }
+                   }
+               }
+           }
+       }
+       
+       return { schedules, conflicts };
+   }
+   ```
+
+3. CONFLICT DETECTION ALGORITHM
+   Location: backend/scheduler.js - timesOverlap() function (lines 647-664)
+   
+   Description: Detects if two time ranges overlap by converting time strings
+   to minutes and using interval comparison.
+   
+   CODE PROOF:
+   ```javascript
+   timesOverlap(start1, end1, start2, end2) {
+       // Convert time strings (HH:MM:SS) to minutes for accurate comparison
+       const start1Min = this.timeToMinutes(start1);
+       const end1Min = this.timeToMinutes(end1);
+       const start2Min = this.timeToMinutes(start2);
+       const end2Min = this.timeToMinutes(end2);
+       
+       // Two intervals overlap if: start1 < end2 AND start2 < end1
+       return start1Min < end2Min && start2Min < end1Min;
+   }
+
+   timeToMinutes(timeString) {
+       // Convert HH:MM:SS to minutes since midnight
+       if (!timeString) return 0;
+       const parts = timeString.split(':');
+       const hours = parseInt(parts[0], 10) || 0;
+       const minutes = parseInt(parts[1], 10) || 0;
+       return hours * 60 + minutes;
+   }
+   ```
+   
+   Example:
+   - Time 1: 8:00-10:00 → 480-600 minutes
+   - Time 2: 9:00-11:00 → 540-660 minutes
+   - Check: 480 < 660 AND 540 < 600 → TRUE (overlap!)
+
+4. PRIORITY SORTING ALGORITHM
+   Location: backend/scheduler.js - sortCoursesByPriority() (lines 209-267)
+   
+   Description: Sorts courses by multiple criteria to determine scheduling order.
+   
+   CODE PROOF:
+   ```javascript
+   sortCoursesByPriority(courses, sections) {
+       return courses.sort((a, b) => {
+           // 1. Sort by Year Level (Year 1 first)
+           if (a.year_level !== b.year_level) {
+               return a.year_level - b.year_level;
+           }
+           
+           // 2. Sort by Course Type (Lecture before Lab)
+           const typeOrder = { 'lecture': 0, 'leclab': 1, 'laboratory': 2 };
+           const aTypeOrder = typeOrder[a.type] || 3;
+           const bTypeOrder = typeOrder[b.type] || 3;
+           if (aTypeOrder !== bTypeOrder) {
+               return aTypeOrder - bTypeOrder;
+           }
+           
+           // 3. Sort by Course Name (Alphabetically)
+           if (a.name !== b.name) {
+               return a.name.localeCompare(b.name);
+           }
+           
+           // 4. Final: Sort by Course ID
+           return a.id - b.id;
+       });
+   }
+   ```
+
+5. SMART SESSION ALLOCATION ALGORITHM
+   Location: backend/scheduler.js - getSessionsForYearLevel() (lines 14-23)
+   
+   Description: Dynamically determines number of sessions based on year level
+   to balance educational quality with resource capacity.
+   
+   CODE PROOF:
+   ```javascript
+   getSessionsForYearLevel(yearLevel) {
+       if (yearLevel <= 2) {
+           return 2;  // Year 1-2: Full coverage (foundational courses)
+       } else {
+           return 1;  // Year 3-4: Efficient (advanced courses)
+       }
+   }
+   ```
+   
+   Applied in scheduling:
+   ```javascript
+   scheduleLecture(course, section, rooms, roomOccupancy, sectionOccupancy, hours, programCode) {
+       const lectureRooms = rooms.filter(r => r.type === 'lecture');
+       
+       for (const room of lectureRooms) {
+           const sessions = this.getSessionsForYearLevel(course.year_level);
+           const slots = this.findFlexibleSlots(room, section, hours, sessions, 
+                                                roomOccupancy, sectionOccupancy);
+           
+           if (slots && slots.length >= sessions) {
+               // Create schedules for each slot
+               const schedules = slots.slice(0, sessions).map((slot) => ({
+                   section_id: section.id,
+                   course_id: course.id,
+                   room_id: room.id,
+                   day_pattern: slot.day,
+                   start_time: slot.startTime,
+                   end_time: slot.endTime,
+                   schedule_type: 'lecture'
+               }));
+               
+               return { success: true, schedules };
+           }
+       }
+   }
+   ```
+
+DATA STRUCTURES USED:
+---------------------
+
+1. HASH MAP / OBJECT (Room Occupancy Tracking)
+   Location: backend/scheduler.js - initializeOccupancy() (lines 708-720)
+   
+   Description: Uses JavaScript objects as hash maps to track occupied time slots
+   per room per day with O(1) lookup time.
+   
+   CODE PROOF:
+   ```javascript
+   initializeOccupancy(rooms) {
+       const occupancy = {};
+       const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+       
+       for (const room of rooms) {
+           for (const day of days) {
+               const key = `${room.id}-${day}`;  // Hash key: "roomId-day"
+               occupancy[key] = [];  // Array of occupied time slots
+           }
+       }
+       
+       return occupancy;
+   }
+   
+   // Structure example:
+   // {
+   //   "1-Mon": [{start: "08:00:00", end: "10:00:00"}, ...],
+   //   "1-Tue": [{start: "14:00:00", end: "16:00:00"}, ...],
+   //   "2-Mon": [],
+   //   ...
+   // }
+   ```
+   
+   Usage in conflict detection:
+   ```javascript
+   isSlotAvailable(roomId, sectionId, days, startTime, endTime, 
+                   roomOccupancy, sectionOccupancy) {
+       for (const day of days) {
+           const roomKey = `${roomId}-${day}`;
+           
+           // O(1) lookup in hash map
+           if (roomOccupancy[roomKey]) {
+               // O(n) check through occupied slots (typically small n)
+               for (const slot of roomOccupancy[roomKey]) {
+                   if (this.timesOverlap(startTime, endTime, slot.start, slot.end)) {
+                       return false;  // Conflict detected
+                   }
+               }
+           }
+       }
+       return true;
+   }
+   ```
+
+2. SET (Day Tracking)
+   Location: backend/scheduler.js - findFlexibleSlots() (line 472)
+   
+   Description: Uses JavaScript Set to track which days have been used,
+   ensuring sessions are on different days.
+   
+   CODE PROOF:
+   ```javascript
+   findFlexibleSlots(room, section, hoursPerSession, numSlotsNeeded, 
+                     roomOccupancy, sectionOccupancy) {
+       const availableSlots = [];
+       const usedDays = new Set();  // Set for O(1) add and lookup
+       
+       for (const day of days) {
+           // O(1) check if day already used
+           if (usedDays.has(day) && availableSlots.length > 0) {
+               continue;  // Skip to next day
+           }
+           
+           // ... find slot on this day ...
+           
+           if (slotFound) {
+               availableSlots.push({day, startTime, endTime});
+               usedDays.add(day);  // O(1) add to set
+           }
+       }
+   }
+   ```
+   
+   Set operations:
+   - has(day): O(1) - Check if day used
+   - add(day): O(1) - Mark day as used
+
+3. ARRAY (Hierarchical Grouping)
+   Location: backend/scheduler.js - groupCoursesByProgramAndTerm() (lines 190-207)
+   
+   Description: Nested object structure to organize courses hierarchically
+   by program and term.
+   
+   CODE PROOF:
+   ```javascript
+   groupCoursesByProgramAndTerm(courses, sections) {
+       const grouped = {};
+       
+       for (const course of courses) {
+           const programCode = course.program_code;
+           const term = course.term;
+           
+           // Initialize nested structure
+           if (!grouped[programCode]) {
+               grouped[programCode] = {};
+           }
+           if (!grouped[programCode][term]) {
+               grouped[programCode][term] = [];
+           }
+           
+           // Add course to appropriate array
+           grouped[programCode][term].push(course);
+       }
+       
+       return grouped;
+   }
+   
+   // Resulting structure:
+   // {
+   //   'BSCS': {
+   //     'TERM 1': [course1, course2, ...],
+   //     'TERM 2': [course5, course6, ...],
+   //     'TERM 3': [course9, course10, ...]
+   //   },
+   //   'BSIS': { ... },
+   //   'BSIT': { ... }
+   // }
+   ```
+
+4. QUEUE-LIKE ARRAY (Schedule and Conflict Collection)
+   Location: backend/scheduler.js - generateSchedules() (lines 15-16)
+   
+   Description: Arrays used as queues to collect successful schedules
+   and failed attempts (conflicts).
+   
+   CODE PROOF:
+   ```javascript
+   generateSchedules(sections, courses, rooms) {
+       const schedules = [];   // Array to collect all successful schedules
+       const conflicts = [];   // Array to collect all conflicts
+       
+       for (const program of programOrder) {
+           for (const term of termOrder) {
+               for (const course of sortedCourses) {
+                   const result = this.scheduleCourseForSection(...);
+                   
+                   if (result.success) {
+                       // Push successful schedules to array
+                       schedules.push(...result.schedules);
+                   } else {
+                       // Push conflict info to array
+                       conflicts.push({
+                           course: course.code,
+                           section: `${course.program_code}${section.year_level}${section.letter}`,
+                           reason: result.reason,
+                           program: program,
+                           term: term
+                       });
+                   }
+               }
+           }
+       }
+       
+       return { schedules, conflicts };
+   }
+   ```
+
+================================================================================
+QUESTION 2: METHODOLOGY - How did you make sure there were no conflicts on 
+            the produced schedules? Prove it.
+================================================================================
+
+METHODOLOGY FOR ENSURING NO CONFLICTS:
+---------------------------------------
+
+1. DUAL OCCUPANCY TRACKING SYSTEM
+   
+   We track TWO types of occupancy simultaneously:
+   a) Room Occupancy - Ensures no room is double-booked
+   b) Section Occupancy - Ensures no student section is double-booked
+   
+   CODE PROOF (Conflict Prevention Check):
+   ```javascript
+   isSlotAvailable(roomId, sectionId, days, startTime, endTime, 
+                   roomOccupancy, sectionOccupancy) {
+       for (const day of days) {
+           // CHECK 1: Room Occupancy
+           const roomKey = `${roomId}-${day}`;
+           if (roomOccupancy[roomKey]) {
+               for (const slot of roomOccupancy[roomKey]) {
+                   if (this.timesOverlap(startTime, endTime, slot.start, slot.end)) {
+                       return false;  // Room already occupied - REJECT
+                   }
+               }
+           }
+           
+           // CHECK 2: Section Occupancy
+           const sectionKey = `${sectionId}-${day}`;
+           if (sectionOccupancy[sectionKey]) {
+               for (const slot of sectionOccupancy[sectionKey]) {
+                   if (this.timesOverlap(startTime, endTime, slot.start, slot.end)) {
+                       return false;  // Section already has class - REJECT
+                   }
+               }
+           }
+       }
+       
+       return true;  // Both checks passed - SLOT AVAILABLE
+   }
+   ```
+   
+   PROOF OF CORRECTNESS:
+   - If ANY slot in room occupancy overlaps → return false → slot rejected
+   - If ANY slot in section occupancy overlaps → return false → slot rejected
+   - ONLY if BOTH checks pass → slot is marked as available
+
+2. IMMEDIATE OCCUPANCY UPDATE
+   
+   After scheduling a course, we IMMEDIATELY update both occupancy trackers
+   BEFORE scheduling the next course.
+   
+   CODE PROOF:
+   ```javascript
+   scheduleLecture(course, section, rooms, roomOccupancy, sectionOccupancy, 
+                   hours, programCode) {
+       const lectureRooms = rooms.filter(r => r.type === 'lecture');
+       
+       for (const room of lectureRooms) {
+           const slots = this.findFlexibleSlots(room, section, hours, sessions, 
+                                                roomOccupancy, sectionOccupancy);
+           
+           if (slots && slots.length >= sessions) {
+               const schedules = slots.slice(0, sessions).map((slot) => ({
+                   section_id: section.id,
+                   course_id: course.id,
+                   room_id: room.id,
+                   day_pattern: slot.day,
+                   start_time: slot.startTime,
+                   end_time: slot.endTime,
+                   schedule_type: 'lecture'
+               }));
+               
+               // IMMEDIATELY mark time slots as occupied
+               schedules.forEach(schedule => {
+                   this.markTimeSlot(schedule, roomOccupancy, sectionOccupancy);
+               });
+               
+               return { success: true, schedules };
+           }
+       }
+   }
+   ```
+   
+   CODE PROOF (Marking Occupancy):
+   ```javascript
+   markTimeSlot(schedule, roomOccupancy, sectionOccupancy) {
+       const days = [schedule.day_pattern];
+       
+       for (const day of days) {
+           // Mark in ROOM occupancy
+           const roomKey = `${schedule.room_id}-${day}`;
+           if (!roomOccupancy[roomKey]) {
+               roomOccupancy[roomKey] = [];
+           }
+           roomOccupancy[roomKey].push({
+               start: schedule.start_time,
+               end: schedule.end_time
+           });
+           
+           // Mark in SECTION occupancy
+           const sectionKey = `${schedule.section_id}-${day}`;
+           if (!sectionOccupancy[sectionKey]) {
+               sectionOccupancy[sectionKey] = [];
+           }
+           sectionOccupancy[sectionKey].push({
+               start: schedule.start_time,
+               end: schedule.end_time
+           });
+       }
+   }
+   ```
+
+3. ACCURATE TIME OVERLAP DETECTION
+   
+   We use NUMERIC comparison (converting times to minutes) instead of
+   string comparison to ensure accurate overlap detection.
+   
+   CODE PROOF:
+   ```javascript
+   timesOverlap(start1, end1, start2, end2) {
+       // Convert to minutes since midnight for accurate comparison
+       const start1Min = this.timeToMinutes(start1);  // e.g., "08:00:00" → 480
+       const end1Min = this.timeToMinutes(end1);      // e.g., "10:00:00" → 600
+       const start2Min = this.timeToMinutes(start2);  // e.g., "09:00:00" → 540
+       const end2Min = this.timeToMinutes(end2);      // e.g., "11:00:00" → 660
+       
+       // Mathematical overlap detection: start1 < end2 AND start2 < end1
+       return start1Min < end2Min && start2Min < end1Min;
+       // Example: 480 < 660 (true) AND 540 < 600 (true) = OVERLAP DETECTED
+   }
+
+   timeToMinutes(timeString) {
+       if (!timeString) return 0;
+       const parts = timeString.split(':');
+       const hours = parseInt(parts[0], 10) || 0;
+       const minutes = parseInt(parts[1], 10) || 0;
+       return hours * 60 + minutes;
+   }
+   ```
+   
+   MATHEMATICAL PROOF:
+   Two time intervals [start1, end1] and [start2, end2] overlap if and only if:
+   - start1 < end2 (first starts before second ends)
+   - AND start2 < end1 (second starts before first ends)
+   
+   Examples:
+   - [8:00, 10:00] vs [9:00, 11:00]: 8:00 < 11:00 ✓ AND 9:00 < 10:00 ✓ = OVERLAP
+   - [8:00, 10:00] vs [10:00, 12:00]: 8:00 < 12:00 ✓ BUT 10:00 < 10:00 ✗ = NO OVERLAP
+   - [8:00, 10:00] vs [11:00, 13:00]: 8:00 < 13:00 ✓ BUT 11:00 < 10:00 ✗ = NO OVERLAP
+
+4. DIFFERENT-DAY ENFORCEMENT
+   
+   To prevent students from having multiple sessions of the same course on
+   the same day, we track which days have been used.
+   
+   CODE PROOF:
+   ```javascript
+   findFlexibleSlots(room, section, hoursPerSession, numSlotsNeeded, 
+                     roomOccupancy, sectionOccupancy) {
+       const availableSlots = [];
+       const usedDays = new Set();  // Track which days already used
+       
+       for (const day of days) {
+           // ENFORCE: Skip day if already used (ensures different days)
+           if (usedDays.has(day) && availableSlots.length > 0) {
+               continue;  // Move to next day
+           }
+           
+           // Find ONE slot on this day
+           for (let hour = startHour; hour < endHour; hour++) {
+               if (slotAvailable) {
+                   availableSlots.push({day, startTime, endTime});
+                   usedDays.add(day);  // Mark day as used
+                   break;  // Move to next day
+               }
+           }
+       }
+   }
+   ```
+   
+   PROOF: If session 1 is scheduled on Monday, usedDays = {Mon}. When searching
+   for session 2, Monday is skipped, forcing the search to continue to Tuesday,
+   Wednesday, etc. This guarantees different days for different sessions.
+
+VERIFICATION METHOD:
+--------------------
+
+SQL Query to verify NO conflicts exist:
+
+```sql
+-- Check for room conflicts (same room, same day, overlapping times)
+SELECT 
+    r.name as room_name,
+    s1.day_pattern,
+    s1.start_time,
+    s1.end_time,
+    c1.name as course1,
+    s2.start_time as overlap_start,
+    s2.end_time as overlap_end,
+    c2.name as course2
+FROM schedules s1
+JOIN schedules s2 ON s1.room_id = s2.room_id 
+                 AND s1.day_pattern = s2.day_pattern
+                 AND s1.id < s2.id
+JOIN courses c1 ON s1.course_id = c1.id
+JOIN courses c2 ON s2.course_id = c2.id
+JOIN rooms r ON s1.room_id = r.id
+WHERE (s1.start_time < s2.end_time AND s2.start_time < s1.end_time);
+
+-- If result is EMPTY → NO room conflicts ✓
+-- If result has rows → Room conflicts exist ✗
+
+-- Check for section conflicts (same section, same day, overlapping times)
+SELECT 
+    CONCAT(p.code, sec.year_level, sec.letter) as section_name,
+    s1.day_pattern,
+    s1.start_time,
+    s1.end_time,
+    c1.name as course1,
+    s2.start_time as overlap_start,
+    s2.end_time as overlap_end,
+    c2.name as course2
+FROM schedules s1
+JOIN schedules s2 ON s1.section_id = s2.section_id 
+                 AND s1.day_pattern = s2.day_pattern
+                 AND s1.id < s2.id
+JOIN courses c1 ON s1.course_id = c1.id
+JOIN courses c2 ON s2.course_id = c2.id
+JOIN sections sec ON s1.section_id = sec.id
+JOIN programs p ON sec.program_id = p.id
+WHERE (s1.start_time < s2.end_time AND s2.start_time < s1.end_time);
+
+-- If result is EMPTY → NO section conflicts ✓
+-- If result has rows → Section conflicts exist ✗
+```
+
+MATHEMATICAL PROOF OF CONFLICT-FREE SCHEDULING:
+------------------------------------------------
+
+Theorem: If the scheduling algorithm completes successfully, the resulting
+schedule has no conflicts.
+
+Proof by Induction:
+
+Base Case (n = 0): 
+  With 0 courses scheduled, there are no conflicts (trivially true).
+
+Inductive Step:
+  Assume the first n courses are scheduled without conflicts.
+  
+  When scheduling course (n+1):
+  1. isSlotAvailable() checks ALL n existing schedules for overlaps
+  2. If ANY overlap detected → slot is rejected → try another slot
+  3. If NO overlaps detected → slot is marked as available
+  4. Schedule is created and added to database
+  5. Occupancy is IMMEDIATELY updated with this new schedule
+  
+  Therefore, course (n+1) cannot conflict with courses 1...n because:
+  - If it would conflict, isSlotAvailable() would return false
+  - We only create schedules when isSlotAvailable() returns true
+  - When true, mathematical overlap check guarantees no time overlaps
+  
+  By induction, all N courses are scheduled without conflicts.
+
+QED (Quod Erat Demonstrandum)
+
+================================================================================
+QUESTION 3: How do you ensure that all courses for each term are allocated 
+            with room and lab?
+================================================================================
+
+METHODOLOGY FOR ENSURING ALL COURSES GET ROOMS:
+------------------------------------------------
+
+1. ROOM TYPE MATCHING SYSTEM
+   
+   Each course type is matched with appropriate room types:
+   - Lecture courses → Lecture rooms only
+   - Laboratory courses → Lab rooms only
+   - LecLab courses → Both lecture AND lab rooms
+   
+   CODE PROOF:
+   ```javascript
+   scheduleCourseForSection(course, section, rooms, roomOccupancy, sectionOccupancy) {
+       const programCode = course.program_code;
+       
+       if (course.type === 'lecture') {
+           // Use LECTURE rooms only
+           const hours = course.hours_lecture || 2;
+           const result = this.scheduleLecture(course, section, rooms, 
+                                              roomOccupancy, sectionOccupancy, 
+                                              hours, programCode);
+           return result;
+           
+       } else if (course.type === 'laboratory') {
+           // Use LAB rooms only
+           const hours = course.hours_lab || 2;
+           const result = this.scheduleLaboratory(course, section, rooms, 
+                                                  roomOccupancy, sectionOccupancy, 
+                                                  hours, programCode);
+           return result;
+           
+       } else if (course.type === 'leclab') {
+           // Use BOTH lecture and lab rooms
+           const lectureHours = isIT ? 2 : (course.hours_lecture || 2.67);
+           const labHours = isIT ? 2 : (course.hours_lab || 4);
+           
+           const result = this.scheduleLecLab(course, section, rooms, 
+                                             roomOccupancy, sectionOccupancy, 
+                                             lectureHours, labHours, programCode);
+           return result;
+       }
+   }
+   ```
+
+2. ROOM ITERATION WITH FALLBACK
+   
+   The system tries EVERY available room of the correct type before giving up.
+   
+   CODE PROOF (Lecture Rooms):
+   ```javascript
+   scheduleLecture(course, section, rooms, roomOccupancy, sectionOccupancy, 
+                   hours, programCode) {
+       const lectureRooms = rooms.filter(r => r.type === 'lecture');
+       
+       // Try EACH lecture room sequentially
+       for (const room of lectureRooms) {
+           const sessions = this.getSessionsForYearLevel(course.year_level);
+           const slots = this.findFlexibleSlots(room, section, hours, sessions, 
+                                                roomOccupancy, sectionOccupancy);
+           
+           if (slots && slots.length >= sessions) {
+               // Found enough slots in this room - SUCCESS
+               const schedules = slots.slice(0, sessions).map((slot) => ({
+                   section_id: section.id,
+                   course_id: course.id,
+                   room_id: room.id,
+                   day_pattern: slot.day,
+                   start_time: slot.startTime,
+                   end_time: slot.endTime,
+                   schedule_type: 'lecture'
+               }));
+               
+               schedules.forEach(schedule => {
+                   this.markTimeSlot(schedule, roomOccupancy, sectionOccupancy);
+               });
+               
+               return { success: true, schedules };
+           }
+           // If not found in this room, continue to next room
+       }
+       
+       // Only report conflict if ALL rooms tried and none worked
+       return { success: false, reason: 'No available lecture room slots' };
+   }
+   ```
+   
+   PROOF: The loop iterates through ALL lecture rooms. Only returns conflict
+   if EVERY room fails to provide enough slots. This maximizes the chance of
+   finding a suitable room.
+
+3. DECOUPLED LECLAB SCHEDULING
+   
+   For LecLab courses, lecture and lab sessions are scheduled independently,
+   increasing the chances of finding suitable rooms for both.
+   
+   CODE PROOF:
+   ```javascript
+   scheduleLecLab(course, section, rooms, roomOccupancy, sectionOccupancy, 
+                  lectureHours, labHours, programCode) {
+       const lectureRooms = rooms.filter(r => r.type === 'lecture');
+       const labRooms = rooms.filter(r => r.type === 'laboratory');
+       
+       // STEP 1: Find lecture slots INDEPENDENTLY
+       let lectureSlots = null;
+       for (const lectureRoom of lectureRooms) {
+           lectureSlots = this.findFlexibleSlots(lectureRoom, section, lectureHours, 
+                                                 sessions, roomOccupancy, sectionOccupancy);
+           if (lectureSlots && lectureSlots.length >= sessions) {
+               break;  // Found lecture slots
+           }
+       }
+       
+       if (!lectureSlots || lectureSlots.length < sessions) {
+           return { success: false, reason: 'No available lecture room slots for leclab' };
+       }
+       
+       // STEP 2: Create temporary occupancy with lecture slots marked
+       const tempRoomOccupancy = JSON.parse(JSON.stringify(roomOccupancy));
+       const tempSectionOccupancy = JSON.parse(JSON.stringify(sectionOccupancy));
+       
+       lectureSlots.slice(0, sessions).forEach(slot => {
+           const tempSchedule = {
+               room_id: lectureRooms[0].id,
+               day_pattern: slot.day,
+               start_time: slot.startTime,
+               end_time: slot.endTime,
+               section_id: section.id
+           };
+           
+           // Mark lecture times in temp occupancy
+           const roomKey = `${tempSchedule.room_id}-${tempSchedule.day_pattern}`;
+           const sectionKey = `${section.id}-${tempSchedule.day_pattern}`;
+           if (!tempRoomOccupancy[roomKey]) tempRoomOccupancy[roomKey] = [];
+           if (!tempSectionOccupancy[sectionKey]) tempSectionOccupancy[sectionKey] = [];
+           
+           tempRoomOccupancy[roomKey].push({
+               start: tempSchedule.start_time,
+               end: tempSchedule.end_time
+           });
+           tempSectionOccupancy[sectionKey].push({
+               start: tempSchedule.start_time,
+               end: tempSchedule.end_time
+           });
+       });
+       
+       // STEP 3: Find lab slots INDEPENDENTLY using temp occupancy
+       let labSlots = null;
+       for (const labRoom of labRooms) {
+           labSlots = this.findFlexibleSlots(labRoom, section, labHours, sessions, 
+                                            tempRoomOccupancy, tempSectionOccupancy);
+           if (labSlots && labSlots.length >= sessions) {
+               break;  // Found lab slots
+           }
+       }
+       
+       if (!labSlots || labSlots.length < sessions) {
+           return { success: false, reason: 'No available lab room slots for leclab' };
+       }
+       
+       // STEP 4: Both found - create schedules
+       const schedules = [];
+       
+       // Create lecture schedules
+       lectureSlots.slice(0, sessions).forEach(slot => {
+           schedules.push({
+               section_id: section.id,
+               course_id: course.id,
+               room_id: lectureRoomUsed.id,
+               day_pattern: slot.day,
+               start_time: slot.startTime,
+               end_time: slot.endTime,
+               schedule_type: 'lecture'
+           });
+       });
+       
+       // Create lab schedules
+       labSlots.slice(0, sessions).forEach(slot => {
+           schedules.push({
+               section_id: section.id,
+               course_id: course.id,
+               room_id: labRoomUsed.id,
+               day_pattern: slot.day,
+               start_time: slot.startTime,
+               end_time: slot.endTime,
+               schedule_type: 'lab'
+           });
+       });
+       
+       // Mark all schedules in REAL occupancy
+       schedules.forEach(schedule => {
+           this.markTimeSlot(schedule, roomOccupancy, sectionOccupancy);
+       });
+       
+       return { success: true, schedules };
+   }
+   ```
+   
+   PROOF: Lecture and lab searches are completely independent. Lecture slots
+   are found first, then lab slots are searched using temporary occupancy that
+   includes the lecture times (so students don't have overlapping lecture/lab).
+   This decoupling increases flexibility and success rate.
+
+4. FLEXIBLE TIME SLOT SEARCH
+   
+   The system searches with 30-minute granularity across all available days,
+   maximizing the chances of finding suitable time slots.
+   
+   CODE PROOF:
+   ```javascript
+   findFlexibleSlots(room, section, hoursPerSession, numSlotsNeeded, 
+                     roomOccupancy, sectionOccupancy) {
+       const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];  // 6 days
+       
+       for (const day of days) {
+           for (let hour = startHour; hour < endHour; hour++) {  // 14 hours
+               for (let minute = 0; minute < 60; minute += 30) {  // 30-min intervals
+                   // Calculate slot times
+                   const slotStartTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
+                   const slotEndTime = // ... calculate
+                   
+                   // Check availability
+                   if (this.isSlotAvailable(room.id, section.id, [day], 
+                                           slotStartTime, slotEndTime, 
+                                           roomOccupancy, sectionOccupancy)) {
+                       availableSlots.push({day, startTime: slotStartTime, endTime: slotEndTime});
+                       usedDays.add(day);
+                       break;
+                   }
+               }
+           }
+       }
+   }
+   ```
+   
+   SEARCH SPACE:
+   - 6 days (Mon-Sat)
+   - 14 hours per day (7am-9pm)
+   - 30-minute granularity (28 intervals per day)
+   - Total search space: 6 × 28 = 168 possible starting times per room
+   
+   PROOF: With 168 possible slot starting times per room and multiple rooms
+   available, the system has hundreds of potential slot combinations to try
+   before declaring a conflict.
+
+5. SATURDAY CLASSES FOR EXTRA CAPACITY
+   
+   By including Saturday in the available days, we increase room capacity by 20%.
+   
+   CODE PROOF:
+   ```javascript
+   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];  // Saturday included
+   ```
+   
+   CAPACITY CALCULATION:
+   - Without Saturday: 5 days × 14 hours × 5 rooms = 350 room-hours/week
+   - With Saturday: 6 days × 14 hours × 5 rooms = 420 room-hours/week
+   - Increase: 420 - 350 = 70 room-hours (+20%)
+
+6. SMART SESSION ALLOCATION TO REDUCE DEMAND
+   
+   By allocating fewer sessions to upper-year courses, we reduce overall
+   room demand while maintaining educational quality.
+   
+   CODE PROOF:
+   ```javascript
+   getSessionsForYearLevel(yearLevel) {
+       if (yearLevel <= 2) {
+           return 2;  // Year 1-2: 2 sessions per course
+       } else {
+           return 1;  // Year 3-4: 1 session per course
+       }
+   }
+   ```
+   
+   DEMAND REDUCTION CALCULATION:
+   Assume 50% courses are Year 1-2, 50% are Year 3-4:
+   - Average sessions: (0.5 × 2) + (0.5 × 1) = 1.5 sessions/course
+   - Compared to fixed 2 sessions: 1.5/2 = 75% of original demand
+   - Demand reduction: 25%
+
+VERIFICATION:
+-------------
+
+SQL Query to verify all courses are allocated:
+
+```sql
+-- Check which courses are scheduled
+SELECT 
+    c.id,
+    c.code,
+    c.name,
+    c.type,
+    c.year_level,
+    p.code as program,
+    c.term,
+    COUNT(DISTINCT s.section_id) as sections_scheduled
+FROM courses c
+JOIN programs p ON c.program_id = p.id
+LEFT JOIN schedules s ON c.id = s.course_id
+GROUP BY c.id, c.code, c.name, c.type, c.year_level, p.code, c.term
+ORDER BY p.code, c.term, c.year_level;
+
+-- Courses with sections_scheduled = 0 → Not allocated ✗
+-- Courses with sections_scheduled > 0 → Allocated ✓
+
+-- Check which courses have both lecture AND lab rooms (for leclab type)
+SELECT 
+    c.code,
+    c.name,
+    COUNT(DISTINCT CASE WHEN s.schedule_type = 'lecture' THEN s.room_id END) as lecture_rooms,
+    COUNT(DISTINCT CASE WHEN s.schedule_type = 'lab' THEN s.room_id END) as lab_rooms
+FROM courses c
+JOIN schedules s ON c.id = s.course_id
+WHERE c.type = 'leclab'
+GROUP BY c.id, c.code, c.name;
+
+-- For leclab courses:
+-- lecture_rooms > 0 AND lab_rooms > 0 → Fully allocated ✓
+-- lecture_rooms = 0 OR lab_rooms = 0 → Partially allocated ✗
+```
+
+CAPACITY PLANNING PROOF:
+-------------------------
+
+To mathematically prove all courses can be allocated:
+
+Available Capacity per Term:
+  Lecture: 3 rooms × 6 days × 14 hours = 252 hours
+  Lab: 2 rooms × 6 days × 14 hours = 168 hours
+  Total: 420 room-hours per term
+
+Demand Calculation (Example for BSCS TERM 1):
+  Assume 11 courses, 2.5 sections avg, 1.5 sessions avg, 2.67 hours avg
+  Demand = 11 × 2.5 × 1.5 × 2.67 = 110 hours
+  
+  110 hours < 252 hours available → FITS ✓
+
+With proper capacity planning (smart session allocation, Saturday classes),
+the demand fits within available capacity, ensuring all courses can be allocated.
+
+================================================================================
+QUESTION 4: How do you ensure that all sections per year have proper time 
+            allocation?
+================================================================================
+
+METHODOLOGY FOR ENSURING ALL SECTIONS GET PROPER TIME ALLOCATION:
+------------------------------------------------------------------
+
+1. SECTION GROUPING BY YEAR LEVEL
+   
+   All sections at the same year level take the SAME courses, ensuring
+   consistent curriculum delivery.
+   
+   CODE PROOF:
+   ```javascript
+   generateSchedules(sections, courses, rooms) {
+       for (const program of programOrder) {
+           for (const term of termOrder) {
+               const termCourses = coursesByProgramTerm[program][term] || [];
+               const sortedCourses = this.sortCoursesByPriority(termCourses, programSections);
+               
+               // For each course
+               for (const course of sortedCourses) {
+                   // Get ALL sections at this course's year level
+                   const courseSections = programSections.filter(s => 
+                       s.year_level === course.year_level
+                   );
+                   
+                   // Schedule this course for EACH section
+                   for (const section of courseSections) {
+                       const result = this.scheduleCourseForSection(
+                           course, section, rooms, roomOccupancy, sectionOccupancy
+                       );
+                       
+                       if (result.success) {
+                           schedules.push(...result.schedules);
+                       } else {
+                           conflicts.push({/* conflict info */});
+                       }
+                   }
+               }
+           }
+       }
+   }
+   ```
+   
+   PROOF: The filter `s => s.year_level === course.year_level` ensures that
+   every section at a given year level (e.g., Year 1: 1A, 1B, 1C) will attempt
+   to schedule the same course. This guarantees curriculum consistency.
+
+2. INDEPENDENT SCHEDULING PER SECTION
+   
+   Each section is scheduled independently, allowing different time slots
+   for the same course across different sections.
+   
+   CODE PROOF:
+   ```javascript
+   for (const section of courseSections) {
+       // Each section gets its own independent scheduling attempt
+       const result = this.scheduleCourseForSection(
+           course,          // Same course for all sections
+           section,         // Different section
+           rooms,           // Same room pool
+           roomOccupancy,   // Shared occupancy (prevents room conflicts)
+           sectionOccupancy // Per-section occupancy (prevents section conflicts)
+       );
+   }
+   ```
+   
+   EXAMPLE:
+   ```
+   Fundamentals of Programming (Year 1 course)
+   
+   BSCS1A:
+   ├─ Lecture 1: Monday 7:00-9:40 AM, Room 204
+   └─ Lecture 2: Wednesday 7:00-9:40 AM, Room 204
+   
+   BSCS1B:
+   ├─ Lecture 1: Tuesday 10:00-12:40 PM, Room 205    ← Different times!
+   └─ Lecture 2: Thursday 10:00-12:40 PM, Room 205   ← Different times!
+   
+   BSCS1C:
+   ├─ Lecture 1: Monday 2:00-4:40 PM, Room 206       ← Different times!
+   └─ Lecture 2: Wednesday 2:00-4:40 PM, Room 206    ← Different times!
+   ```
+   
+   PROOF: Each section's `scheduleCourseForSection()` call is independent.
+   The section occupancy tracker ensures section 1A's times don't conflict
+   with 1A's other courses, but sections 1B and 1C can use overlapping times
+   (different students, no conflict).
+
+3. SECTION OCCUPANCY TRACKING
+   
+   Each section has its own occupancy tracker to prevent double-booking
+   of that section.
+   
+   CODE PROOF:
+   ```javascript
+   initializeSectionOccupancyForProgram(sections) {
+       const occupancy = {};
+       const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+       
+       for (const section of sections) {
+           for (const day of days) {
+               const key = `${section.id}-${day}`;  // Unique per section-day
+               occupancy[key] = [];  // Array of occupied times for this section
+           }
+       }
+       
+       return occupancy;
+   }
+   ```
+   
+   USAGE:
+   ```javascript
+   isSlotAvailable(roomId, sectionId, days, startTime, endTime, 
+                   roomOccupancy, sectionOccupancy) {
+       for (const day of days) {
+           // Check if THIS SECTION is busy at this time
+           const sectionKey = `${sectionId}-${day}`;
+           if (sectionOccupancy[sectionKey]) {
+               for (const slot of sectionOccupancy[sectionKey]) {
+                   if (this.timesOverlap(startTime, endTime, slot.start, slot.end)) {
+                       return false;  // Section already has class - REJECT
+                   }
+               }
+           }
+       }
+       return true;
+   }
+   ```
+   
+   PROOF: Each section ID gets its own occupancy entries. When scheduling
+   course X for section 1A, we check sectionOccupancy["1A-Monday"]. When
+   scheduling course Y for section 1B, we check sectionOccupancy["1B-Monday"].
+   These are independent, preventing intra-section conflicts while allowing
+   inter-section time reuse.
+
+4. YEAR-BASED SESSION ALLOCATION
+   
+   Different year levels get different numbers of sessions based on
+   educational priorities, but ALL sections at a year level get the same
+   number of sessions.
+   
+   CODE PROOF:
+   ```javascript
+   getSessionsForYearLevel(yearLevel) {
+       if (yearLevel <= 2) {
+           return 2;  // ALL Year 1-2 sections: 2 sessions
+       } else {
+           return 1;  // ALL Year 3-4 sections: 1 session
+       }
+   }
+   
+   // Used in scheduling:
+   scheduleLecture(course, section, rooms, roomOccupancy, sectionOccupancy, 
+                   hours, programCode) {
+       const sessions = this.getSessionsForYearLevel(course.year_level);
+       
+       // ALL sections at this year level get same number of sessions
+       const slots = this.findFlexibleSlots(room, section, hours, sessions, 
+                                            roomOccupancy, sectionOccupancy);
+   }
+   ```
+   
+   EXAMPLE:
+   ```
+   Year 1 sections (1A, 1B, 1C): ALL get 2 sessions per course
+   Year 2 sections (2A, 2B): ALL get 2 sessions per course
+   Year 3 sections (3A): ALL get 1 session per course
+   Year 4 sections (4A, 4B): ALL get 1 session per course
+   ```
+   
+   PROOF: The function getSessionsForYearLevel() depends ONLY on year_level,
+   not on section ID. Therefore, all sections at the same year level are
+   guaranteed to get the same number of sessions.
+
+5. PRIORITY SORTING ENSURES FAIR SCHEDULING
+   
+   Courses are sorted by year level (Year 1 first) to ensure foundational
+   courses get priority access to room slots.
+   
+   CODE PROOF:
+   ```javascript
+   sortCoursesByPriority(courses, sections) {
+       return courses.sort((a, b) => {
+           // Primary sort: Year Level (Year 1 first)
+           if (a.year_level !== b.year_level) {
+               return a.year_level - b.year_level;  // 1, 2, 3, 4
+           }
+           
+           // Secondary sort: Course Type
+           const typeOrder = { 'lecture': 0, 'leclab': 1, 'laboratory': 2 };
+           const aTypeOrder = typeOrder[a.type] || 3;
+           const bTypeOrder = typeOrder[b.type] || 3;
+           if (aTypeOrder !== bTypeOrder) {
+               return aTypeOrder - bTypeOrder;
+           }
+           
+           // Tertiary sort: Course Name
+           if (a.name !== b.name) {
+               return a.name.localeCompare(b.name);
+           }
+           
+           // Final: Course ID
+           return a.id - b.id;
+       });
+   }
+   ```
+   
+   IMPACT:
+   - Year 1 courses scheduled first → more time slots available → higher success rate
+   - Year 2, 3, 4 follow → still get scheduled but with remaining slots
+   - Ensures foundational courses (which ALL sections need) get allocated first
+
+VERIFICATION:
+-------------
+
+SQL Query to verify all sections have proper time allocation:
+
+```sql
+-- Check that all sections have schedules
+SELECT 
+    p.code as program,
+    s.year_level,
+    s.letter as section,
+    COUNT(DISTINCT sch.course_id) as courses_scheduled,
+    COUNT(sch.id) as total_sessions
+FROM sections s
+JOIN programs p ON s.program_id = p.id
+LEFT JOIN schedules sch ON s.id = sch.section_id
+GROUP BY p.code, s.year_level, s.letter
+ORDER BY p.code, s.year_level, s.letter;
+
+-- Expected:
+-- All sections should have courses_scheduled > 0
+-- Year 1-2 sections should have higher total_sessions (2 per course)
+-- Year 3-4 sections should have lower total_sessions (1 per course)
+
+-- Check that sections at same year level have same courses
+SELECT 
+    s1.year_level,
+    s1.letter as section1,
+    s2.letter as section2,
+    COUNT(DISTINCT c1.id) as courses_section1,
+    COUNT(DISTINCT c2.id) as courses_section2,
+    COUNT(DISTINCT CASE WHEN c1.id = c2.id THEN c1.id END) as shared_courses
+FROM sections s1
+JOIN sections s2 ON s1.program_id = s2.program_id 
+                AND s1.year_level = s2.year_level 
+                AND s1.id < s2.id
+LEFT JOIN schedules sch1 ON s1.id = sch1.section_id
+LEFT JOIN schedules sch2 ON s2.id = sch2.section_id
+LEFT JOIN courses c1 ON sch1.course_id = c1.id
+LEFT JOIN courses c2 ON sch2.course_id = c2.id
+GROUP BY s1.year_level, s1.letter, s2.letter;
+
+-- Expected: 
+-- courses_section1 = courses_section2 = shared_courses
+-- (All sections at same year level take same courses)
+```
+
+MATHEMATICAL PROOF:
+-------------------
+
+Theorem: All sections at year level Y get schedules for all courses at year level Y.
+
+Proof:
+Let C_y = set of courses at year level Y
+Let S_y = set of sections at year level Y
+
+For each course c in C_y:
+  For each section s in S_y:
+    scheduleCourseForSection(c, s, ...) is called
+    
+    Result is either:
+    (a) success: true → schedule created for (c, s)
+    (b) success: false → conflict recorded for (c, s)
+    
+    Therefore, every (course, section) pair is attempted.
+
+If no conflicts occur, then every section s in S_y has schedules for
+every course c in C_y.
+
+The number of sessions per course is determined by getSessionsForYearLevel(Y),
+which returns the same value for all sections at year level Y.
+
+Therefore, all sections at year level Y have:
+- The same set of courses
+- The same number of sessions per course
+- Different time slots (due to independent scheduling)
+
+QED
+
+================================================================================
+END OF ANSWERS
+================================================================================
+
